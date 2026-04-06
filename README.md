@@ -70,6 +70,9 @@ http://localhost:8080
 
 Navigate the dashboard, set your sensitivity or remappings, and click **Start Bridge** to begin injecting inputs.
 
+> [!WARNING]
+> **UART Port Configuration:** By default, the serial port is set to `/dev/ttyAMA0`. Depending on your Raspberry Pi model and whether you have enabled the Hardware UART vs Mini UART, you may need to change this port to `/dev/ttyS0` or `/dev/serial0` in the **Settings** tab of the Web Dashboard. If GP-Injector fails to start, check the "Console Logs" box for UART path or permission errors!
+
 ## 🛠️ Architecture
 
 GP-Injector safely separates into two decoupled layers:
