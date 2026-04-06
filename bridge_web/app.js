@@ -45,9 +45,12 @@ document.addEventListener('DOMContentLoaded', () => {
    THEMING
    ============================================================ */
 function setupTheme() {
-    const isLightMode = localStorage.getItem('theme') === 'light';
-    if (isLightMode) {
-        document.documentElement.classList.add('light-mode');
+    const isDarkMode = localStorage.getItem('theme') === 'dark';
+    if (isDarkMode) {
+        document.documentElement.classList.add('dark-mode');
+        document.getElementById('theme-icon-sun').style.display = 'block';
+        document.getElementById('theme-icon-moon').style.display = 'none';
+    } else {
         document.getElementById('theme-icon-sun').style.display = 'none';
         document.getElementById('theme-icon-moon').style.display = 'block';
     }
@@ -55,14 +58,14 @@ function setupTheme() {
     const toggleBtn = document.getElementById('theme-toggle');
     if (toggleBtn) {
         toggleBtn.addEventListener('click', () => {
-            const isLight = document.documentElement.classList.toggle('light-mode');
-            localStorage.setItem('theme', isLight ? 'light' : 'dark');
-            if (isLight) {
-                document.getElementById('theme-icon-sun').style.display = 'none';
-                document.getElementById('theme-icon-moon').style.display = 'block';
-            } else {
+            const isDark = document.documentElement.classList.toggle('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            if (isDark) {
                 document.getElementById('theme-icon-sun').style.display = 'block';
                 document.getElementById('theme-icon-moon').style.display = 'none';
+            } else {
+                document.getElementById('theme-icon-sun').style.display = 'none';
+                document.getElementById('theme-icon-moon').style.display = 'block';
             }
             // Redraw canvases with new theme colors
             drawCurve('left');
@@ -245,11 +248,12 @@ function drawStick(canvasId, x, y) {
     const cy = h / 2;
     const r = Math.min(cx, cy) - 12;
 
-    const isLight = document.documentElement.classList.contains('light-mode');
-    const colorLineOuter = isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.08)';
-    const colorLineInner = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.04)';
-    const colorLineDz = isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.06)';
-    const colorAccent = isLight ? '#00aacc' : '#00f0ff';
+    const isDark = document.documentElement.classList.contains('dark-mode');
+    const colorLineOuter = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(14, 15, 12, 0.12)';
+    const colorLineInner = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(14, 15, 12, 0.08)';
+    const colorLineDz = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(14, 15, 12, 0.08)';
+    const colorAccent = isDark ? '#ffffff' : '#0e0f0c'; // Near black or white dot
+    const colorTrail = isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(14, 15, 12, 0.4)';
 
     ctx.clearRect(0, 0, w, h);
 
@@ -287,20 +291,20 @@ function drawStick(canvasId, x, y) {
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(dotX, dotY);
-    ctx.strokeStyle = isLight ? 'rgba(0, 170, 204, 0.4)' : 'rgba(0, 240, 255, 0.2)';
+    ctx.strokeStyle = colorTrail;
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
     // Dot glow
     const gradient = ctx.createRadialGradient(dotX, dotY, 0, dotX, dotY, 12);
-    gradient.addColorStop(0, isLight ? 'rgba(0, 170, 204, 0.3)' : 'rgba(0, 240, 255, 0.4)');
-    gradient.addColorStop(1, isLight ? 'rgba(0, 170, 204, 0)' : 'rgba(0, 240, 255, 0)');
+    gradient.addColorStop(0, 'rgba(159, 232, 112, 0.5)'); // Wise Green Glow
+    gradient.addColorStop(1, 'rgba(159, 232, 112, 0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(dotX - 12, dotY - 12, 24, 24);
 
     // Dot
     ctx.beginPath();
-    ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
+    ctx.arc(dotX, dotY, 6, 0, Math.PI * 2); // Slightly bigger dot
     ctx.fillStyle = colorAccent;
     ctx.fill();
 }
@@ -821,12 +825,12 @@ function drawCurve(side) {
     const curveType = document.getElementById('curve-' + side).value;
     const mult = parseInt(document.getElementById('mult-' + side).value) / 10;
 
-    const isLight = document.documentElement.classList.contains('light-mode');
-    const colorGrid = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.04)';
-    const colorText = isLight ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.3)';
-    const colorRef = isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.08)';
-    const colorLine = isLight ? '#00aacc' : '#00f0ff';
-    const colorGlow = isLight ? 'rgba(0, 170, 204, 0.3)' : 'rgba(0, 240, 255, 0.3)';
+    const isDark = document.documentElement.classList.contains('dark-mode');
+    const colorGrid = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(14, 15, 12, 0.08)';
+    const colorText = isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(14, 15, 12, 0.5)';
+    const colorRef = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(14, 15, 12, 0.2)';
+    const colorLine = isDark ? '#ffffff' : '#0e0f0c'; // Draw the curve in white or near-black
+    const colorGlow = 'rgba(159, 232, 112, 0.4)'; // Wise Green Glow over the line
 
     ctx.clearRect(0, 0, w, h);
 
