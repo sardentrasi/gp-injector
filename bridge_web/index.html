@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GP-Injector — Controller Config</title>
+    <meta name="description" content="Web configuration dashboard for GP-Injector UART gamepad bridge">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Sidebar Navigation -->
+<nav id="sidebar">
+    <div class="sidebar-logo">
+        <div class="logo-icon">GP</div>
+        <span class="logo-text">GP-Injector</span>
+    </div>
+    <ul class="nav-list">
+        <li class="nav-item active" data-tab="dashboard" id="nav-dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span>Dashboard</span>
+        </li>
+        <li class="nav-item" data-tab="mapping" id="nav-mapping">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <span>Mapping</span>
+        </li>
+        <li class="nav-item" data-tab="antirecoil" id="nav-antirecoil">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            <span>Anti-Recoil</span>
+        </li>
+        <li class="nav-item" data-tab="turbo" id="nav-turbo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Turbo</span>
+        </li>
+        <li class="nav-item" data-tab="sticks" id="nav-sticks">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+            <span>Sticks</span>
+        </li>
+        <li class="nav-item" data-tab="profiles" id="nav-profiles">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Profiles</span>
+        </li>
+        <li class="nav-item" data-tab="kbmouse" id="nav-kbmouse">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><circle cx="18" cy="10" r="1"></circle><path d="M14 16v0"></path><path d="M10 16v0"></path><path d="M6 16v0"></path></svg>
+            <span>KB & Mouse</span>
+        </li>
+        <li class="nav-item" data-tab="settings" id="nav-settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Settings</span>
+        </li>
+    </ul>
+
+    <div class="sidebar-footer">
+        <div class="profile-badge" id="sidebar-profile-badge">
+            <span class="profile-dot"></span>
+            <span id="sidebar-active-profile">Default</span>
+        </div>
+        <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle theme">
+            <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        </button>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main id="main-content">
+
+    <!-- ===== DASHBOARD TAB ===== -->
+    <section id="tab-dashboard" class="tab-content active">
+        <div class="tab-header">
+            <h1>Dashboard</h1>
+            <p class="tab-subtitle">Monitor & control your bridge</p>
+        </div>
+
+        <!-- Signal Chain -->
+        <div class="card signal-chain-card">
+            <div class="signal-chain">
+                <div class="signal-node">
+                    <div class="signal-icon">🎮</div>
+                    <div class="signal-label">Gamepad</div>
+                    <div class="signal-sub" id="signal-gamepad">Not connected</div>
+                </div>
+                <div class="signal-arrow">
+                    <svg viewBox="0 0 40 12"><path d="M0 6h34l-4-4M34 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                </div>
+                <div class="signal-node">
+                    <div class="signal-icon">🖥️</div>
+                    <div class="signal-label">Pi Bridge</div>
+                    <div class="signal-sub">
+                        <span class="status-dot" id="status-dot"></span>
+                        <span id="status-text">Stopped</span>
+                    </div>
+                </div>
+                <div class="signal-arrow">
+                    <svg viewBox="0 0 40 12"><path d="M0 6h34l-4-4M34 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                </div>
+                <div class="signal-node">
+                    <div class="signal-icon">🔌</div>
+                    <div class="signal-label">RP2040</div>
+                    <div class="signal-sub" id="signal-uart">UART</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls Row -->
+        <div class="row">
+            <div class="card control-card">
+                <button class="btn btn-start" id="btn-start" onclick="bridgeStart()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Start Bridge
+                </button>
+                <button class="btn btn-stop" id="btn-stop" onclick="bridgeStop()" disabled>
+                    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    Stop Bridge
+                </button>
+            </div>
+        </div>
+
+        <!-- Live Input Viewer -->
+        <div class="card">
+            <h2 class="card-title">Live Input Viewer</h2>
+            <div class="live-viewer">
+                <!-- Left Stick -->
+                <div class="viewer-block">
+                    <h3>Left Stick</h3>
+                    <canvas id="canvas-left-stick" width="160" height="160"></canvas>
+                    <div class="axis-values">
+                        <span>X: <b id="lx-val">0</b></span>
+                        <span>Y: <b id="ly-val">0</b></span>
+                    </div>
+                </div>
+                <!-- Right Stick -->
+                <div class="viewer-block">
+                    <h3>Right Stick</h3>
+                    <canvas id="canvas-right-stick" width="160" height="160"></canvas>
+                    <div class="axis-values">
+                        <span>X: <b id="rx-val">0</b></span>
+                        <span>Y: <b id="ry-val">0</b></span>
+                    </div>
+                </div>
+                <!-- Buttons -->
+                <div class="viewer-block viewer-block-wide">
+                    <h3>Buttons</h3>
+                    <div class="button-grid" id="button-grid"></div>
+                </div>
+                <!-- Triggers & DPad -->
+                <div class="viewer-block">
+                    <h3>Triggers</h3>
+                    <div class="trigger-bars">
+                        <div class="trigger-row"><span>LT</span><div class="trigger-bar"><div class="trigger-fill" id="lt-bar"></div></div><span id="lt-val">0</span></div>
+                        <div class="trigger-row"><span>RT</span><div class="trigger-bar"><div class="trigger-fill" id="rt-bar"></div></div><span id="rt-val">0</span></div>
+                    </div>
+                    <h3 style="margin-top:16px">DPad</h3>
+                    <div class="dpad-visual">
+                        <div class="dpad-btn dpad-up" id="dpad-up">▲</div>
+                        <div class="dpad-btn dpad-left" id="dpad-left">◄</div>
+                        <div class="dpad-center"></div>
+                        <div class="dpad-btn dpad-right" id="dpad-right">►</div>
+                        <div class="dpad-btn dpad-down" id="dpad-down">▼</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="card">
+            <h2 class="card-title">Packet Log</h2>
+            <div class="log-container" id="log-container">
+                <div class="log-empty">No packets yet. Start the bridge to see live data.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== MAPPING TAB ===== -->
+    <section id="tab-mapping" class="tab-content">
+        <div class="tab-header">
+            <h1>Button Mapping</h1>
+            <p class="tab-subtitle">Remap any button to another</p>
+        </div>
+        <div class="card">
+            <div class="remap-info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span>Select a target for each physical button. "Same" = no remap.</span>
+            </div>
+            <div class="remap-grid" id="remap-grid"></div>
+            <div class="card-actions">
+                <button class="btn btn-secondary" onclick="resetRemap()">Reset All</button>
+                <button class="btn btn-primary" onclick="saveProfile()">Save Mapping</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ANTI-RECOIL TAB ===== -->
+    <section id="tab-antirecoil" class="tab-content">
+        <div class="tab-header">
+            <h1>Anti-Recoil</h1>
+            <p class="tab-subtitle">Compensate for weapon recoil automatically</p>
+        </div>
+        <div class="card">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Enable Anti-Recoil</h3>
+                    <p>Automatically pull stick down when firing</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="ar-enabled">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <hr class="divider">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Strength</h3>
+                    <p>Compensation amount (0 = off, 100 = max)</p>
+                </div>
+                <div class="slider-group">
+                    <input type="range" id="ar-strength" min="0" max="100" value="30" class="slider">
+                    <span class="slider-value" id="ar-strength-val">30</span>
+                </div>
+            </div>
+            <hr class="divider">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Activation Button</h3>
+                    <p>Anti-recoil activates when this button is held</p>
+                </div>
+                <select id="ar-activation" class="select-input"></select>
+            </div>
+            <hr class="divider">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Axis</h3>
+                    <p>Which stick axis to compensate</p>
+                </div>
+                <select id="ar-axis" class="select-input">
+                    <option value="ry">Right Stick Y</option>
+                    <option value="rx">Right Stick X</option>
+                    <option value="ly">Left Stick Y</option>
+                    <option value="lx">Left Stick X</option>
+                </select>
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="saveProfile()">Save Anti-Recoil</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== TURBO TAB ===== -->
+    <section id="tab-turbo" class="tab-content">
+        <div class="tab-header">
+            <h1>Turbo / Rapid Fire</h1>
+            <p class="tab-subtitle">Toggle buttons on/off rapidly while held</p>
+        </div>
+        <div class="card">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Turbo Speed</h3>
+                    <p>Presses per second (Hz)</p>
+                </div>
+                <div class="slider-group">
+                    <input type="range" id="turbo-speed" min="5" max="30" value="15" class="slider">
+                    <span class="slider-value" id="turbo-speed-val">15 Hz</span>
+                </div>
+            </div>
+            <hr class="divider">
+            <h3 style="margin-bottom:12px">Per-Button Turbo</h3>
+            <div class="turbo-grid" id="turbo-grid"></div>
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="saveProfile()">Save Turbo</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== STICKS TAB ===== -->
+    <section id="tab-sticks" class="tab-content">
+        <div class="tab-header">
+            <h1>Stick Tuning</h1>
+            <p class="tab-subtitle">Deadzone & sensitivity curve</p>
+        </div>
+        <div class="row">
+            <!-- Left Stick -->
+            <div class="card card-half">
+                <h2 class="card-title">Left Stick</h2>
+                <div class="setting-row">
+                    <div class="setting-label"><h3>Deadzone</h3></div>
+                    <div class="slider-group">
+                        <input type="range" id="dz-left" min="0" max="30" value="5" class="slider">
+                        <span class="slider-value" id="dz-left-val">5%</span>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-label"><h3>Curve</h3></div>
+                    <select id="curve-left" class="select-input">
+                        <option value="linear">Linear</option>
+                        <option value="exponential">Exponential</option>
+                        <option value="s_curve">S-Curve</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-label"><h3>Multiplier</h3></div>
+                    <div class="slider-group">
+                        <input type="range" id="mult-left" min="1" max="30" value="10" class="slider">
+                        <span class="slider-value" id="mult-left-val">1.0x</span>
+                    </div>
+                </div>
+                <canvas id="curve-canvas-left" width="240" height="180" class="curve-canvas"></canvas>
+            </div>
+            <!-- Right Stick -->
+            <div class="card card-half">
+                <h2 class="card-title">Right Stick</h2>
+                <div class="setting-row">
+                    <div class="setting-label"><h3>Deadzone</h3></div>
+                    <div class="slider-group">
+                        <input type="range" id="dz-right" min="0" max="30" value="5" class="slider">
+                        <span class="slider-value" id="dz-right-val">5%</span>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-label"><h3>Curve</h3></div>
+                    <select id="curve-right" class="select-input">
+                        <option value="linear">Linear</option>
+                        <option value="exponential">Exponential</option>
+                        <option value="s_curve">S-Curve</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-label"><h3>Multiplier</h3></div>
+                    <div class="slider-group">
+                        <input type="range" id="mult-right" min="1" max="30" value="10" class="slider">
+                        <span class="slider-value" id="mult-right-val">1.0x</span>
+                    </div>
+                </div>
+                <canvas id="curve-canvas-right" width="240" height="180" class="curve-canvas"></canvas>
+            </div>
+        </div>
+        <div class="card-actions" style="margin-top:12px">
+            <button class="btn btn-primary" onclick="saveProfile()">Save Stick Settings</button>
+        </div>
+    </section>
+
+    <!-- ===== PROFILES TAB ===== -->
+    <section id="tab-profiles" class="tab-content">
+        <div class="tab-header">
+            <h1>Profiles</h1>
+            <p class="tab-subtitle">Manage multiple configurations</p>
+        </div>
+        <div class="card">
+            <div class="profile-create">
+                <input type="text" id="new-profile-name" placeholder="New profile name..." class="text-input">
+                <button class="btn btn-primary" onclick="createProfile()">Create</button>
+            </div>
+            <hr class="divider">
+            <div class="profile-list" id="profile-list"></div>
+        </div>
+    </section>
+
+    <!-- ===== KB & MOUSE TAB ===== -->
+    <section id="tab-kbmouse" class="tab-content">
+        <div class="tab-header">
+            <h1>Keyboard & Mouse</h1>
+            <p class="tab-subtitle">Map PC peripherals to controller output</p>
+        </div>
+        <div class="card">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Mouse Sensitivity</h3>
+                    <p>Adjust turning speed (0 - 100)</p>
+                </div>
+                <div class="slider-group">
+                    <input type="range" id="mouse-sens" min="1" max="100" value="50" class="slider">
+                    <span class="slider-value" id="mouse-sens-val">50</span>
+                </div>
+            </div>
+            <hr class="divider">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Invert Mouse Y</h3>
+                    <p>Reverse up/down aim direction</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="mouse-invert">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <hr class="divider">
+            <h3 style="margin-bottom:12px">Key Bindings</h3>
+            <div id="kbm-bindings-container" class="kbm-grid">
+                <!-- Dynamically populated -->
+            </div>
+            <div class="card-actions" style="margin-top: 16px;">
+                <button class="btn btn-secondary" onclick="addBindingRow()">+ Add Binding</button>
+                <button class="btn btn-primary" onclick="saveProfile()">Save Bindings</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SETTINGS TAB ===== -->
+    <section id="tab-settings" class="tab-content">
+        <div class="tab-header">
+            <h1>Settings</h1>
+            <p class="tab-subtitle">Hardware & connection configuration</p>
+        </div>
+        <div class="card">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Input Mode</h3>
+                    <p>Use gamepad or keyboard + mouse</p>
+                </div>
+                <select id="cfg-input-mode" class="select-input">
+                    <option value="gamepad">Gamepad</option>
+                    <option value="kb_mouse">Keyboard & Mouse</option>
+                </select>
+            </div>
+            <hr class="divider">
+            <div class="setting-row" id="row-cfg-device">
+                <div class="setting-label">
+                    <h3>Gamepad Device</h3>
+                    <p>Active when in Gamepad mode</p>
+                </div>
+                <div class="device-select-group">
+                    <input type="text" id="cfg-device" class="text-input" value="auto">
+                    <button class="btn btn-secondary btn-sm" onclick="detectDevices('gamepad')">Detect</button>
+                </div>
+            </div>
+            <div id="detected-devices-gamepad" class="detected-devices" style="display:none"></div>
+            
+            <div class="setting-row kbmouse-only-setting" id="row-cfg-kb" style="display:none">
+                <div class="setting-label">
+                    <h3>Keyboard Device</h3>
+                </div>
+                <div class="device-select-group">
+                    <input type="text" id="cfg-keyboard" class="text-input" placeholder="/dev/input/eventX">
+                    <button class="btn btn-secondary btn-sm" onclick="detectDevices('keyboard')">Detect</button>
+                </div>
+            </div>
+            <div id="detected-devices-keyboard" class="detected-devices" style="display:none"></div>
+
+            <div class="setting-row kbmouse-only-setting" id="row-cfg-mouse" style="display:none">
+                <div class="setting-label">
+                    <h3>Mouse Device</h3>
+                </div>
+                <div class="device-select-group">
+                    <input type="text" id="cfg-mouse" class="text-input" placeholder="/dev/input/eventY">
+                    <button class="btn btn-secondary btn-sm" onclick="detectDevices('mouse')">Detect</button>
+                </div>
+            </div>
+            <div id="detected-devices-mouse" class="detected-devices" style="display:none"></div>
+            <hr class="divider">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Serial Port</h3>
+                    <p>UART device path</p>
+                </div>
+                <input type="text" id="cfg-serial" class="text-input" value="/dev/ttyAMA0">
+            </div>
+            <hr class="divider">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Baud Rate</h3>
+                    <p>UART speed</p>
+                </div>
+                <input type="number" id="cfg-baud" class="text-input text-input-short" value="500000">
+            </div>
+            <hr class="divider">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <h3>Debug Interval</h3>
+                    <p>Seconds between packet log entries</p>
+                </div>
+                <input type="number" id="cfg-debug-interval" class="text-input text-input-short" value="0.5" step="0.1" min="0.1">
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
