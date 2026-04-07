@@ -33,6 +33,13 @@ except ImportError:
     print("[!] evdev not installed. Gamepad disabled.")
 
 try:
+    import RPi.GPIO as GPIO
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+except ImportError:
+    GPIO = None
+
+try:
     from flask import Flask, jsonify, request, send_from_directory
 except ImportError:
     print("[X] Flask not installed. Run: pip install flask")
@@ -584,6 +591,11 @@ class BridgeWorker(threading.Thread):
                                 elif c == 17:
                                     raw_dpad['up']   = 1 if val < 0 else 0
                                     raw_dpad['down'] = 1 if val > 0 else 0
+                    except OSError as e:
+                        if getattr(e, 'errno', None) == 19:
+                            self._log("[!] Device disconnected (ENODEV)")
+                            self._stop_event.set()
+                            break
                     except Exception:
                         pass
 
@@ -712,6 +724,11 @@ class BridgeWorker(threading.Thread):
                                     mouse_dx += event.value
                                 elif event.code == ecodes.REL_Y:
                                     mouse_dy += event.value
+                    except OSError as e:
+                        if getattr(e, 'errno', None) == 19:
+                            self._log("[!] Device disconnected (ENODEV)")
+                            self._stop_event.set()
+                            break
                     except Exception:
                         pass
 
@@ -763,6 +780,53 @@ class BridgeWorker(threading.Thread):
 config_mgr = ConfigManager()
 bridge_worker = None
 bridge_lock = threading.Lock()
+BRIDGE_ENABLED = True
+
+def _check_device_available():
+    config = config_mgr.get()
+    input_mode = config.get('input_mode', 'gamepad')
+    if not evdev: return False
+    
+    if input_mode == 'gamepad':
+        path = config.get('device_path', 'auto')
+        if path == 'auto' or not path:
+            for p in evdev.list_devices():
+                try:
+                    d = evdev.InputDevice(p)
+                    caps = d.capabilities()
+                    if ecodes.EV_ABS in caps and ecodes.EV_KEY in caps:
+                        name_low = d.name.lower()
+                        if 'touchpad' in name_low or 'motion' in name_low or 'keyboard' in name_low or 'mouse' in name_low:
+                            d.close()
+                            continue
+                        d.close()
+                        return True
+                    d.close()
+                except Exception:
+                    pass
+            return False
+        else:
+            return os.path.exists(path)
+    elif input_mode == 'kb_mouse':
+        kp = config.get('keyboard_device', '')
+        mp = config.get('mouse_device', '')
+        if kp and os.path.exists(kp): return True
+        if mp and os.path.exists(mp): return True
+        return False
+    return False
+
+def monitor_loop():
+    global bridge_worker, BRIDGE_ENABLED
+    while True:
+        time.sleep(2)
+        if not BRIDGE_ENABLED:
+            continue
+            
+        with bridge_lock:
+            if bridge_worker is None or not bridge_worker.is_running:
+                if _check_device_available():
+                    bridge_worker = BridgeWorker(config_mgr)
+                    bridge_worker.start()
 
 app = Flask(__name__, static_folder=WEB_DIR)
 
@@ -847,19 +911,25 @@ def api_delete_profile(name):
 
 @app.route('/api/start', methods=['POST'])
 def api_start():
-    global bridge_worker
+    global bridge_worker, BRIDGE_ENABLED
     with bridge_lock:
+        BRIDGE_ENABLED = True
         if bridge_worker and bridge_worker.is_running:
             return jsonify({'ok': False, 'error': 'Already running'})
-        bridge_worker = BridgeWorker(config_mgr)
-        bridge_worker.start()
-    return jsonify({'ok': True})
+        
+        if _check_device_available():
+            bridge_worker = BridgeWorker(config_mgr)
+            bridge_worker.start()
+            return jsonify({'ok': True})
+        else:
+            return jsonify({'ok': False, 'error': 'No device found'})
 
 
 @app.route('/api/stop', methods=['POST'])
 def api_stop():
-    global bridge_worker
+    global bridge_worker, BRIDGE_ENABLED
     with bridge_lock:
+        BRIDGE_ENABLED = False
         if bridge_worker and bridge_worker.is_running:
             bridge_worker.stop()
             bridge_worker.join(timeout=3)
@@ -891,6 +961,42 @@ def api_devices():
     return jsonify({'devices': devices})
 
 
+def _auto_release_pin(pin, delay):
+    time.sleep(delay)
+    if GPIO:
+        try:
+            GPIO.setup(pin, GPIO.IN)
+            print(f"[*] Auto-released GPIO {pin} after {delay}s")
+        except Exception:
+            pass
+
+@app.route('/api/webconfig', methods=['POST'])
+def api_webconfig():
+    data = request.json
+    action = data.get('action') # 'hold' or 'release'
+    pin = data.get('pin', 18) # Default to GPIO18
+    
+    if GPIO:
+        try:
+            if action == 'hold':
+                GPIO.setup(pin, GPIO.OUT)
+                GPIO.output(pin, GPIO.LOW)
+                # Auto release after 15 seconds to ensure it's not stuck
+                t = threading.Thread(target=_auto_release_pin, args=(pin, 15), daemon=True)
+                t.start()
+                return jsonify({'ok': True, 'msg': f'Pin {pin} held LOW for 15s'})
+            elif action == 'release':
+                GPIO.setup(pin, GPIO.IN)
+                return jsonify({'ok': True, 'msg': f'Pin {pin} released (INPUT)'})
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)})
+    else:
+        # Fallback if RPi.GPIO is not available (e.g., testing on PC)
+        print(f"[!] Simulation: WebConfig GPIO {pin} -> {action}")
+        return jsonify({'ok': True, 'msg': 'Simulation mode'})
+    return jsonify({'ok': False, 'error': 'Invalid action'})
+
+
 # ============================================================
 # MAIN
 # ============================================================
@@ -908,10 +1014,10 @@ def main():
     if not os.path.exists(CONFIG_FILE):
         config_mgr.save()
 
-    # Auto-start bridge on launch
-    bridge_worker = BridgeWorker(config_mgr)
-    bridge_worker.start()
-    print("[*] Bridge auto-started.")
+    # Start monitor loop
+    monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
+    monitor_thread.start()
+    print("[*] Device monitor started. Bridge will auto-start when a gamepad is connected.")
 
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
 

@@ -18,6 +18,7 @@ const BUTTON_DISPLAY = {
 let currentProfile = {};
 let pollTimer = null;
 let lastLogCount = 0;
+let webConfigPingTimer = null;
 
 
 /* ============================================================
@@ -365,6 +366,71 @@ async function bridgeStop() {
         toast('Bridge stopped.', 'info');
     }
 }
+
+/* ============================================================
+   WEB CONFIG FLOW
+   ============================================================ */
+async function enterWebConfig() {
+    // 1. Call API to hold pin (GPIO 18 LOW)
+    // Backend will auto-release it after 15 seconds.
+    const res = await api('webconfig', 'POST', { action: 'hold', pin: 18 });
+    if (!res || !res.ok) {
+        toast('Failed to configure GPIO', 'error');
+        return;
+    }
+
+    // 2. Show loading UI
+    document.getElementById('webconfig-intro').style.display = 'none';
+    document.getElementById('webconfig-loading').style.display = 'block';
+
+    // 3. Start pinging 192.168.7.1
+    // We use an EXACT Image check instead of fetch.
+    // If there is an IP conflict (e.g. WSL or Router) responding to 192.168.7.1,
+    // they usually return 404 HTML for /favicon.ico, which triggers onerror.
+    // Only the real GP2040-CE will return a valid image and trigger onload!
+    if (webConfigPingTimer) clearInterval(webConfigPingTimer);
+    
+    webConfigPingTimer = setInterval(() => {
+        const img = new Image();
+        
+        img.onload = () => {
+            // Valid image loaded! GP2040-CE is officially UP.
+            clearInterval(webConfigPingTimer);
+            toast('Connection successful!', 'success');
+            
+            // Open new tab automatically!
+            window.open('http://192.168.7.1', '_blank');
+            
+            // Reset UI
+            document.getElementById('webconfig-intro').style.display = 'block';
+            document.getElementById('webconfig-loading').style.display = 'none';
+        };
+        
+        img.onerror = () => {
+            // Server down, or false positive server returning HTML on 404
+            // Just wait for the next tick
+        };
+        
+        // Timeout image load internally if network drops
+        setTimeout(() => { img.src = ''; }, 800);
+        
+        // Append timestamp to avoid caching
+        img.src = 'http://192.168.7.1/favicon.ico?v=' + Date.now();
+    }, 1000);
+}
+
+async function cancelWebConfig() {
+    if (webConfigPingTimer) clearInterval(webConfigPingTimer);
+    
+    // Explicitly release the pin if user cancels early
+    await api('webconfig', 'POST', { action: 'release', pin: 18 });
+    
+    // Reset UI
+    document.getElementById('webconfig-intro').style.display = 'block';
+    document.getElementById('webconfig-loading').style.display = 'none';
+    toast('Cancelled', 'info');
+}
+
 
 
 /* ============================================================

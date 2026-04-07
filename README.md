@@ -20,6 +20,7 @@ By connecting the Raspberry Pi's TX/RX pins directly to the RP2040 board, GP-Inj
   - **Turbo (Rapid Fire):** Adjustable Hz rapid-fire logic built straight into the loop.
   - **Analog Curves & Deadzones:** Fine-tune radial deadzones and apply Exponential or S-Curve multipliers.
 - 🤖 **Smart Auto-Detection:** Intelligently skips false DualSense event nodes (like Touchpad or Motion sensors) to instantly map onto the primary Gamepad device at boot.
+- ⚙️ **Automated Web Config Bypass:** Directly enter GP2040-CE's native web configurator without holding physical hardware buttons. The Pi securely orchestrates the boot loop via GPIO, featuring an intelligent polling mechanism to safely avoid Windows RNDIS network port conflicts.
 - ⏱️ **Ultra-Low Latency:** Relies on a non-blocking `select`-based polling loop locked at 250Hz minimum to guarantee crisp input delivery and prevent PS5 authentication timeouts.
 
 ## 📦 Requirements
