@@ -13,7 +13,7 @@ By connecting the Raspberry Pi's TX/RX pins directly to the RP2040 board, GP-Inj
 ## ✨ Key Features
 
 - 🌐 **Modern Web Dashboard:** Manage your entire configuration via a responsive, glassmorphism-styled Web UI (Complete with Light & Dark modes).
-- 🕹️ **Dual Mode (Gamepad / KBM):** Play your games using a native PS4/PS5/Xbox controller, or easily switch to Keyboard and Mouse configuration.
+- 🕹️ **Dual Mode (Gamepad / KBM):** Play your games using any gamepad controller, or easily switch to Keyboard and Mouse configuration.
 - 🔧 **Deep Customization:**
   - **Button Remapping:** Remap any paddle or button.
   - **Anti-Recoil:** Dynamically adjusts right-stick pitch automatically when triggers are pulled.
