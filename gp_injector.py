@@ -40,10 +40,15 @@ except ImportError:
     GPIO = None
 
 try:
-    from flask import Flask, jsonify, request, send_from_directory
+    from flask import Flask, jsonify, request, send_from_directory, Response, stream_with_context
 except ImportError:
     print("[X] Flask not installed. Run: pip install flask")
-    sys.exit(1)
+
+try:
+    from flask_sock import Sock
+except ImportError:
+    Sock = None
+    print("[!] flask-sock not installed. WebSocket input disabled.")
 
 # ============================================================
 # CONSTANTS
@@ -132,6 +137,7 @@ class ConfigManager:
         "input_mode": "gamepad",
         "keyboard_device": "",
         "mouse_device": "",
+        "virtual_gamepad": False,
         "web_port": 8080,
         "debug_interval": 0.5,
         "active_profile": "Default",
@@ -142,6 +148,10 @@ class ConfigManager:
 
     def __init__(self):
         self._lock = threading.Lock()
+        self._config_version = 0
+        self._cached_profile = None
+        self._cached_name = None
+        self._cached_version = -1
         self.config = self._load()
 
     def _deep_copy(self, obj):
@@ -180,6 +190,7 @@ class ConfigManager:
 
     def save(self):
         with self._lock:
+            self._config_version += 1
             with open(CONFIG_FILE, 'w') as f:
                 json.dump(self.config, f, indent=2)
 
@@ -190,13 +201,24 @@ class ConfigManager:
     def get_active_profile(self):
         with self._lock:
             name = self.config.get('active_profile', 'Default')
+            if self._cached_version == self._config_version and self._cached_name == name:
+                return name, self._cached_profile
+            
             profiles = self.config.get('profiles', {})
+            profile_data = None
             if name in profiles and profiles[name]:
-                return name, self._deep_copy(profiles[name])
-            first_name = next(iter(profiles), None)
-            if first_name and profiles[first_name]:
-                return first_name, self._deep_copy(profiles[first_name])
-            return 'Default', self._deep_copy(self.DEFAULT_PROFILE)
+                profile_data = self._deep_copy(profiles[name])
+            else:
+                first_name = next(iter(profiles), None)
+                if first_name and profiles[first_name]:
+                    name, profile_data = first_name, self._deep_copy(profiles[first_name])
+                else:
+                    name, profile_data = 'Default', self._deep_copy(self.DEFAULT_PROFILE)
+            
+            self._cached_profile = profile_data
+            self._cached_name = name
+            self._cached_version = self._config_version
+            return name, profile_data
 
     def update_settings(self, data):
         with self._lock:
@@ -374,6 +396,11 @@ class BridgeWorker(threading.Thread):
             'processed_buttons': {b: 0 for b in BUTTON_NAMES},
             'processed_axes': {'lx': 0, 'ly': 0, 'rx': 0, 'ry': 0, 'lt': 0, 'rt': 0},
         }
+        self._virtual_state = {
+            'buttons': {b: 0 for b in BUTTON_NAMES},
+            'axes': {'lx': 0, 'ly': 0, 'rx': 0, 'ry': 0, 'lt': 0, 'rt': 0},
+            'dpad': {'up': 0, 'down': 0, 'left': 0, 'right': 0}
+        }
         self._logs = deque(maxlen=100)
 
     @property
@@ -399,6 +426,21 @@ class BridgeWorker(threading.Thread):
         with self._lock:
             self._logs.append({'time': time.time(), 'msg': msg})
         print(msg)
+
+    def set_virtual_state(self, state):
+        with self._lock:
+            if 'buttons' in state:
+                for k, v in state['buttons'].items():
+                    if k in self._virtual_state['buttons']:
+                        self._virtual_state['buttons'][k] = v
+            if 'axes' in state:
+                for k, v in state['axes'].items():
+                    if k in self._virtual_state['axes']:
+                        self._virtual_state['axes'][k] = int(v)
+            if 'dpad' in state:
+                for k, v in state['dpad'].items():
+                    if k in self._virtual_state['dpad']:
+                        self._virtual_state['dpad'][k] = v
 
     def _rumble_receiver(self, ser, dev):
         effect_id = -1
@@ -457,6 +499,8 @@ class BridgeWorker(threading.Thread):
         try:
             if input_mode == 'kb_mouse':
                 self._run_kb_mouse(config)
+            elif input_mode == 'virtual_gamepad':
+                self._run_virtual_gamepad(config)
             else:
                 self._run_gamepad(config)
         except Exception as e:
@@ -567,16 +611,28 @@ class BridgeWorker(threading.Thread):
         TICK = 1.0 / 250  # 250 Hz
         self._log("[!] Gamepad bridge running at 250 Hz.")
 
+        profile_tick = 0
+        _, profile = self.config_mgr.get_active_profile()
+
         try:
             while not self._stop_event.is_set():
-                r, _, _ = _select([dev], [], [], TICK)
+                start_time = time.time()
+
+                # Periodically clear serial input buffer to prevent buildup (rumble etc)
+                # but only every 50 ticks to save CPU
+                if profile_tick % 50 == 0:
+                    try:
+                        if ser.in_waiting > 100: ser.reset_input_buffer()
+                    except: pass
+
+                # Read events
+                r, _, _ = _select([dev], [], [], 0.0005) # Half ms timeout
                 for d in r:
                     try:
                         for event in d.read():
                             if event.type == ecodes.EV_KEY:
                                 btn_name = EVCODE_TO_BUTTON.get(event.code)
-                                if btn_name:
-                                    raw_buttons[btn_name] = event.value
+                                if btn_name: raw_buttons[btn_name] = event.value
                             elif event.type == ecodes.EV_ABS:
                                 c, val = event.code, event.value
                                 if   c == 0:  raw_axes['lx'] = max(-32768, min(32767, (val - 128) * 256))
@@ -591,19 +647,78 @@ class BridgeWorker(threading.Thread):
                                 elif c == 17:
                                     raw_dpad['up']   = 1 if val < 0 else 0
                                     raw_dpad['down'] = 1 if val > 0 else 0
-                    except OSError as e:
-                        if getattr(e, 'errno', None) == 19:
-                            self._log("[!] Device disconnected (ENODEV)")
-                            self._stop_event.set()
-                            break
-                    except Exception:
-                        pass
+                    except: pass
 
-                # Continuously process to allow time-based features (Turbo) to execute
+                # Get cached profile (zero cost if not changed)
                 _, profile = self.config_mgr.get_active_profile()
+
+                # Process state
                 proc_buttons, proc_axes, proc_dpad = self.processor.process(
                     raw_buttons, raw_axes, raw_dpad, profile
                 )
+                
+                with self._lock:
+                    self._live_state['buttons'] = dict(raw_buttons)
+                    self._live_state['axes'] = dict(raw_axes)
+                    self._live_state['dpad'] = dict(raw_dpad)
+                    self._live_state['processed_buttons'] = dict(proc_buttons)
+                    self._live_state['processed_axes'] = dict(proc_axes)
+                
+                # Send to UART
+                self._build_and_send(ser, proc_buttons, proc_axes, proc_dpad, debug_state)
+
+                # Maintain strict 250Hz frequency
+                profile_tick += 1
+                elapsed = time.time() - start_time
+                wait = TICK - elapsed
+                if wait > 0:
+                    time.sleep(wait)
+                
+        except Exception as e:
+            self._log("[X] Error: " + str(e))
+        finally:
+            ser.close()
+            dev.close()
+
+    # ---- Virtual Gamepad mode ----
+    def _run_virtual_gamepad(self, config):
+        try:
+            ser = serial.Serial(config['serial_port'], config['baud_rate'], timeout=0)
+            self._log("[V] UART: {} @ {} (Virtual Mode)".format(config['serial_port'], config['baud_rate']))
+        except Exception as e:
+            self._log("[X] UART error: " + str(e))
+            return
+
+        debug_state = {'last': 0, 'interval': config.get('debug_interval', 0.5)}
+        TICK = 1.0 / 250  # 250 Hz
+        self._log("[!] Virtual Gamepad bridge running at 250 Hz.")
+        
+        profile_tick = 0
+        _, profile = self.config_mgr.get_active_profile()
+
+        try:
+            while not self._stop_event.is_set():
+                start_time = time.time()
+                
+                # Periodically clear serial input buffer
+                if profile_tick % 50 == 0:
+                    try:
+                        if ser.in_waiting > 100: ser.reset_input_buffer()
+                    except: pass
+                profile_tick += 1
+                
+                # Get cached profile
+                _, profile = self.config_mgr.get_active_profile()
+                
+                with self._lock:
+                    raw_buttons = dict(self._virtual_state['buttons'])
+                    raw_axes = dict(self._virtual_state['axes'])
+                    raw_dpad = dict(self._virtual_state['dpad'])
+
+                proc_buttons, proc_axes, proc_dpad = self.processor.process(
+                    raw_buttons, raw_axes, raw_dpad, profile
+                )
+                
                 with self._lock:
                     self._live_state['buttons'] = dict(raw_buttons)
                     self._live_state['axes'] = dict(raw_axes)
@@ -613,11 +728,14 @@ class BridgeWorker(threading.Thread):
                 
                 self._build_and_send(ser, proc_buttons, proc_axes, proc_dpad, debug_state)
                 
+                elapsed = time.time() - start_time
+                wait = TICK - elapsed
+                if wait > 0:
+                    time.sleep(wait)
         except Exception as e:
             self._log("[X] Error: " + str(e))
         finally:
             ser.close()
-            dev.close()
 
     # ---- Binding parser ----
     @staticmethod
@@ -706,9 +824,21 @@ class BridgeWorker(threading.Thread):
 
         self._log("[!] KB+Mouse bridge running at 250 Hz.")
 
+        profile_tick = 0
+        _, profile = self.config_mgr.get_active_profile()
+
         try:
             while not self._stop_event.is_set():
-                r, _, _ = _select(devices, [], [], TICK)
+                start_time = time.time()
+
+                # Periodically clear serial input buffer
+                if profile_tick % 50 == 0:
+                    try:
+                        if ser.in_waiting > 100: ser.reset_input_buffer()
+                    except: pass
+                profile_tick += 1
+
+                r, _, _ = _select(devices, [], [], 0.0005)
                 for dev in r:
                     try:
                         for event in dev.read():
@@ -732,8 +862,10 @@ class BridgeWorker(threading.Thread):
                     except Exception:
                         pass
 
-                # Build state
+                # Get cached profile
                 _, profile = self.config_mgr.get_active_profile()
+
+                # Build state
                 key_bindings = profile.get('key_bindings', {})
                 mouse_bindings = profile.get('mouse_bindings', {})
                 sens = profile.get('mouse_sensitivity', 50)
@@ -745,17 +877,18 @@ class BridgeWorker(threading.Thread):
 
                 for kn in pressed_keys:
                     self._apply_binding(key_bindings.get(kn, 'none'), raw_buttons, raw_axes, raw_dpad)
+                
+                # Mouse movement
+                if mouse_dx != 0 or mouse_dy != 0:
+                    mx = (mouse_dx * sens) / 10
+                    my = (mouse_dy * sens) / 10
+                    if y_inv: my = -my
+                    raw_axes['rx'] = max(-32768, min(32767, int(mx * 128)))
+                    raw_axes['ry'] = max(-32768, min(32767, int(my * 128)))
+                    mouse_dx, mouse_dy = 0, 0
+
                 for bn in mouse_btns:
                     self._apply_binding(mouse_bindings.get(bn, 'none'), raw_buttons, raw_axes, raw_dpad)
-
-                # Mouse → right stick
-                sm = sens * 3
-                mx = max(-32768, min(32767, int(mouse_dx * sm)))
-                my = max(-32768, min(32767, int(mouse_dy * sm)))
-                if y_inv: my = -my
-                raw_axes['rx'] = max(-32768, min(32767, raw_axes['rx'] + mx))
-                raw_axes['ry'] = max(-32768, min(32767, raw_axes['ry'] + my))
-                mouse_dx, mouse_dy = 0, 0
 
                 proc_buttons, proc_axes, proc_dpad = self.processor.process(
                     raw_buttons, raw_axes, raw_dpad, profile
@@ -767,6 +900,12 @@ class BridgeWorker(threading.Thread):
                     self._live_state['processed_buttons'] = dict(proc_buttons)
                     self._live_state['processed_axes'] = dict(proc_axes)
                 self._build_and_send(ser, proc_buttons, proc_axes, proc_dpad, debug_state)
+
+                # Maintain 250Hz frequency
+                elapsed = time.time() - start_time
+                wait = TICK - elapsed
+                if wait > 0:
+                    time.sleep(wait)
         except Exception as e:
             self._log("[X] Error: " + str(e))
         finally:
@@ -813,6 +952,8 @@ def _check_device_available():
         if kp and os.path.exists(kp): return True
         if mp and os.path.exists(mp): return True
         return False
+    elif input_mode == 'virtual_gamepad':
+        return True
     return False
 
 def monitor_loop():
@@ -847,11 +988,13 @@ def api_status():
     running = bridge_worker is not None and bridge_worker.is_running
     state = bridge_worker.get_state() if running else None
     device_info = bridge_worker.get_device_info() if bridge_worker else None
+    config = config_mgr.get()
     return jsonify({
         'running': running,
         'state': state,
         'device_info': device_info,
-        'active_profile': config_mgr.get().get('active_profile', 'Default')
+        'active_profile': config.get('active_profile', 'Default'),
+        'input_mode': config.get('input_mode', 'gamepad')
     })
 
 
@@ -921,6 +1064,10 @@ def api_start():
             bridge_worker = BridgeWorker(config_mgr)
             bridge_worker.start()
             return jsonify({'ok': True})
+        elif input_mode == 'virtual_gamepad':
+            bridge_worker = BridgeWorker(config_mgr)
+            bridge_worker.start()
+            return jsonify({'ok': True})
         else:
             return jsonify({'ok': False, 'error': 'No device found'})
 
@@ -942,6 +1089,21 @@ def api_logs():
     if bridge_worker:
         return jsonify({'logs': bridge_worker.get_logs()})
     return jsonify({'logs': []})
+
+
+@app.route('/api/state_stream')
+def api_state_stream():
+    """SSE endpoint for pushing live controller state (~30 FPS)"""
+    def generate():
+        global bridge_worker, BRIDGE_ENABLED
+        while BRIDGE_ENABLED and bridge_worker and bridge_worker.is_running:
+            state = bridge_worker.get_state()
+            yield f"data: {json.dumps(state)}\n\n"
+            time.sleep(0.033) # ~30 updates per second
+        # Once stopped or disconnected, send a final blank state
+        yield f"data: {json.dumps({'stopped': True})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
 @app.route('/api/devices')
@@ -995,6 +1157,33 @@ def api_webconfig():
         print(f"[!] Simulation: WebConfig GPIO {pin} -> {action}")
         return jsonify({'ok': True, 'msg': 'Simulation mode'})
     return jsonify({'ok': False, 'error': 'Invalid action'})
+
+@app.route('/api/inject', methods=['POST'])
+def api_inject():
+    global bridge_worker
+    if bridge_worker and bridge_worker.is_running:
+        bridge_worker.set_virtual_state(request.json)
+        return jsonify({'ok': True})
+    return jsonify({'ok': False, 'error': 'Bridge not running'})
+
+
+# WebSocket Handler for Virtual Gamepad
+if Sock:
+    sock = Sock(app)
+    @sock.route('/ws/inject')
+    def ws_inject(ws):
+        global bridge_worker
+        print("[*] WebSocket Client connected for Virtual Gamepad")
+        while True:
+            try:
+                msg = ws.receive()
+                if not msg: break
+                data = json.loads(msg)
+                if bridge_worker and bridge_worker.is_running:
+                    bridge_worker.set_virtual_state(data)
+            except Exception:
+                break
+        print("[*] WebSocket Client disconnected")
 
 
 # ============================================================

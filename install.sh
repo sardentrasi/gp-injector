@@ -30,11 +30,11 @@ fi
 echo "[2/5] Installing Python dependencies..."
 # It's safest to use APT on newer Raspberry Pi OS (Debian Bookworm) to avoid PEP 668 externally-managed errors
 apt-get update
-apt-get install -y python3-pip python3-serial python3-flask python3-evdev || true
+apt-get install -y python3-pip python3-serial python3-flask python3-evdev python3-flask-sock || true
 
 # Fallback to pip install if some packages were not found in apt
 echo "Ensuring pip packages (ignoring managed-env warnings if any)..."
-pip3 install pyserial flask evdev --break-system-packages 2>/dev/null || pip3 install pyserial flask evdev
+pip3 install pyserial flask evdev flask-sock --break-system-packages 2>/dev/null || pip3 install pyserial flask evdev
 
 echo "[3/5] Setting execution permissions..."
 chmod +x "$BRIDGE_SCRIPT"

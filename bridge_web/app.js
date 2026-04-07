@@ -36,10 +36,22 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     loadProfile();
     loadProfiles();
+    applyTabSpecifics();
     startPolling();
     drawCurve('left');
     drawCurve('right');
+    
+    // Virtual Gamepad Init
+    window.virtualGamepad = new VirtualGamepad();
 });
+
+function applyTabSpecifics() {
+    const mode = document.getElementById('cfg-input-mode').value;
+    const warning = document.getElementById('vg-mode-warning');
+    if (warning) {
+        warning.style.display = (mode === 'virtual_gamepad') ? 'none' : 'flex';
+    }
+}
 
 
 /* ============================================================
@@ -77,6 +89,8 @@ function setupTheme() {
     }
 }
 
+let currentActiveTab = 'dashboard';
+
 /* ============================================================
    NAVIGATION
    ============================================================ */
@@ -88,6 +102,9 @@ function setupNavigation() {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             item.classList.add('active');
             document.getElementById('tab-' + tab).classList.add('active');
+            
+            currentActiveTab = tab;
+            manageLiveStream();
         });
     });
 }
@@ -97,13 +114,25 @@ function setupNavigation() {
    API HELPERS
    ============================================================ */
 async function api(path, method = 'GET', body = null) {
-    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), (path === 'inject' ? 1000 : 2000));
+    
+    const opts = { 
+        method, 
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' } 
+    };
     if (body) opts.body = JSON.stringify(body);
+    
     try {
         const res = await fetch('/api/' + path, opts);
+        clearTimeout(id);
         return await res.json();
     } catch (e) {
-        console.error('API error:', e);
+        clearTimeout(id);
+        if (e.name !== 'AbortError') {
+            console.error('API error:', e);
+        }
         return null;
     }
 }
@@ -125,11 +154,23 @@ function toast(msg, type = 'info') {
 
 
 /* ============================================================
-   POLLING
+   POLLING & LIVE MAP
    ============================================================ */
+let isBridgeRunning = false;
+let liveEventSource = null;
+
 function startPolling() {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(pollStatus, 120);
+    if (pollTimer) clearTimeout(pollTimer);
+    
+    const runPoll = async () => {
+        // Hibernation: Slow down system polling to once every 2s when in Virtual Gamepad mode
+        const interval = (currentActiveTab === 'virtual') ? 2000 : 250;
+        
+        await pollStatus();
+        pollTimer = setTimeout(runPoll, interval);
+    };
+    
+    runPoll();
 }
 
 async function pollStatus() {
@@ -140,14 +181,24 @@ async function pollStatus() {
     const text = document.getElementById('status-text');
     const btnStart = document.getElementById('btn-start');
     const btnStop = document.getElementById('btn-stop');
-    const gamepadSub = document.getElementById('signal-gamepad');
+    const gamepadSub = document.getElementById('signal-gamepad-sub');
+    const gamepadIcon = document.getElementById('signal-gamepad-icon');
+    const gamepadLabel = document.getElementById('signal-gamepad-label');
 
     if (data.running) {
+        if (!isBridgeRunning) {
+            isBridgeRunning = true;
+            manageLiveStream();
+        }
         dot.classList.add('running');
         text.textContent = 'Running';
         btnStart.disabled = true;
         btnStop.disabled = false;
     } else {
+        if (isBridgeRunning) {
+            isBridgeRunning = false;
+            manageLiveStream();
+        }
         dot.classList.remove('running');
         text.textContent = 'Stopped';
         btnStart.disabled = false;
@@ -155,23 +206,38 @@ async function pollStatus() {
     }
 
     // Show gamepad device info in signal chain
-    if (data.device_info && data.device_info.name) {
-        gamepadSub.textContent = data.device_info.name;
-        gamepadSub.title = data.device_info.path || '';
+    if (data.input_mode === 'virtual_gamepad') {
+        gamepadIcon.textContent = '📱';
+        gamepadLabel.textContent = 'Virtual Pad';
+        gamepadSub.textContent = data.running ? 'Connected' : 'Ready';
+        gamepadSub.title = 'Web-based input active';
+    } else if (data.input_mode === 'kb_mouse') {
+        gamepadIcon.textContent = '⌨️';
+        gamepadLabel.textContent = 'KB & Mouse';
+        gamepadSub.textContent = data.running ? 'Active' : 'Ready';
     } else {
-        gamepadSub.textContent = data.running ? 'Connecting...' : 'Not connected';
+        gamepadIcon.textContent = '🎮';
+        gamepadLabel.textContent = 'Gamepad';
+        if (data.device_info && data.device_info.name) {
+            gamepadSub.textContent = data.device_info.name;
+            gamepadSub.title = data.device_info.path || '';
+        } else {
+            gamepadSub.textContent = data.running ? 'Connecting...' : 'Not connected';
+        }
     }
 
     document.getElementById('sidebar-active-profile').textContent = data.active_profile || 'Default';
 
-    if (data.state) {
+    if (data.state && (currentActiveTab === 'dashboard' || currentActiveTab === 'sticks')) {
         updateLiveViewer(data.state);
     }
 
-    // Fetch logs
-    const logData = await api('logs');
-    if (logData && logData.logs) {
-        updateLogs(logData.logs);
+    // Only fetch/update logs if we are on the dashboard
+    if (currentActiveTab === 'dashboard') {
+        const logData = await api('logs');
+        if (logData && logData.logs) {
+            updateLogs(logData.logs);
+        }
     }
 }
 
@@ -458,11 +524,16 @@ function updateInputModeUI() {
         gamepadRow.style.display = 'none';
         kbRow.style.display = 'flex';
         mouseRow.style.display = 'flex';
+    } else if (mode === 'virtual_gamepad') {
+        gamepadRow.style.display = 'none';
+        kbRow.style.display = 'none';
+        mouseRow.style.display = 'none';
     } else {
         gamepadRow.style.display = 'flex';
         kbRow.style.display = 'none';
         mouseRow.style.display = 'none';
     }
+    applyTabSpecifics();
 }
 
 function setupInputModeToggle() {
@@ -672,6 +743,25 @@ async function saveProfile() {
     } else {
         toast('Failed to save profile', 'error');
     }
+}
+
+function resetSticks() {
+    document.getElementById('dz-left').value = 5;
+    document.getElementById('dz-left-val').textContent = '5%';
+    document.getElementById('dz-right').value = 5;
+    document.getElementById('dz-right-val').textContent = '5%';
+    
+    document.getElementById('curve-left').value = 'linear';
+    document.getElementById('curve-right').value = 'linear';
+    
+    document.getElementById('mult-left').value = 10;
+    document.getElementById('mult-left-val').textContent = '1.0x';
+    document.getElementById('mult-right').value = 10;
+    document.getElementById('mult-right-val').textContent = '1.0x';
+    
+    drawCurve('left');
+    drawCurve('right');
+    saveProfile();
 }
 
 async function loadProfiles() {
@@ -1033,4 +1123,280 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.appendChild(document.createTextNode(str));
     return div.innerHTML;
+}
+
+
+/* ============================================================
+   STATE STREAMING FOR VISUALIZERS
+   ============================================================ */
+function manageLiveStream() {
+    if (isBridgeRunning && currentActiveTab === 'sticks') {
+        if (!liveEventSource) {
+            liveEventSource = new EventSource('/api/state_stream');
+            liveEventSource.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.stopped) {
+                        if (liveEventSource) { liveEventSource.close(); liveEventSource = null; }
+                        return;
+                    }
+                    updateStickVisualizers(data);
+                } catch (err) {}
+            };
+            liveEventSource.onerror = () => {
+                if (liveEventSource) { liveEventSource.close(); liveEventSource = null; }
+            };
+        }
+    } else {
+        if (liveEventSource) {
+            liveEventSource.close();
+            liveEventSource = null;
+        }
+    }
+}
+
+function updateStickVisualizers(data) {
+    if (!data || !data.axes || !data.processed_axes) return;
+
+    // Map -32768..32767 to 0%..100%
+    const mapAxis = (val) => {
+        let percent = ((val + 32768) / 65535) * 100;
+        return Math.max(0, Math.min(100, percent));
+    };
+
+    const dRawL = document.getElementById('dot-left-raw');
+    const dProcL = document.getElementById('dot-left-proc');
+    if (dRawL && dProcL) {
+        dRawL.style.left = mapAxis(data.axes.lx) + '%';
+        dRawL.style.top  = mapAxis(data.axes.ly) + '%';
+        dProcL.style.left = mapAxis(data.processed_axes.lx) + '%';
+        dProcL.style.top  = mapAxis(data.processed_axes.ly) + '%';
+    }
+
+    const dRawR = document.getElementById('dot-right-raw');
+    const dProcR = document.getElementById('dot-right-proc');
+    if (dRawR && dProcR) {
+        dRawR.style.left = mapAxis(data.axes.rx) + '%';
+        dRawR.style.top  = mapAxis(data.axes.ry) + '%';
+        dProcR.style.left = mapAxis(data.processed_axes.rx) + '%';
+        dProcR.style.top  = mapAxis(data.processed_axes.ry) + '%';
+    }
+}
+
+/* ============================================================
+   VIRTUAL GAMEPAD CLASS
+   ============================================================ */
+class VirtualGamepad {
+    constructor() {
+        this.state = {
+            buttons: {},
+            axes: { lx: 0, ly: 0, rx: 0, ry: 0, lt: 0, rt: 0 },
+            dpad: { up: 0, down: 0, left: 0, right: 0 }
+        };
+        BUTTON_NAMES.forEach(b => this.state.buttons[b] = 0);
+        this.lastSentState = "";
+        this.syncBusy = false;
+        this.ws = null;
+        this.wsConnecting = false;
+
+        this.initEventListeners();
+        this.startSyncLoop();
+    }
+
+    manageSocket() {
+        const currentMode = document.getElementById('cfg-input-mode')?.value;
+        if (currentMode === 'virtual_gamepad' && isBridgeRunning) {
+            if (!this.ws && !this.wsConnecting) {
+                this.wsConnecting = true;
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/inject`;
+                
+                console.log("[*] Connecting WebSocket for Virtual Input...");
+                this.ws = new WebSocket(wsUrl);
+                
+                this.ws.onopen = () => {
+                    console.log("[*] WebSocket Connected");
+                    this.wsConnecting = false;
+                };
+                
+                this.ws.onmessage = (e) => {}; 
+                
+                this.ws.onclose = () => {
+                    console.log("[!] WebSocket Disconnected");
+                    this.ws = null;
+                    this.wsConnecting = false;
+                };
+                
+                this.ws.onerror = (e) => {
+                    this.ws = null;
+                    this.wsConnecting = false;
+                };
+            }
+        } else {
+            if (this.ws) {
+                this.ws.close();
+                this.ws = null;
+            }
+        }
+    }
+
+    initEventListeners() {
+        // Buttons
+        document.querySelectorAll('.vg-btn').forEach(btn => {
+            const handlePress = (e) => {
+                const b = btn.dataset.btn;
+                const d = btn.dataset.dpad;
+                if (b) this.state.buttons[b] = 1;
+                if (d) this.state.dpad[d] = 1;
+                btn.classList.add('active');
+            };
+            const handleRelease = (e) => {
+                const b = btn.dataset.btn;
+                const d = btn.dataset.dpad;
+                if (b) this.state.buttons[b] = 0;
+                if (d) this.state.dpad[d] = 0;
+                btn.classList.remove('active');
+            };
+            
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); handlePress(); });
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); handleRelease(); });
+            btn.addEventListener('mousedown', (e) => { handlePress(); });
+            btn.addEventListener('mouseup', (e) => { handleRelease(); });
+            btn.addEventListener('mouseleave', (e) => { handleRelease(); });
+        });
+
+        // Joysticks (Fixed)
+        this.setupStick('vg-stick-l', 'lx', 'ly', 'vg-stick-l-dot');
+        this.setupStick('vg-stick-r', 'rx', 'ry', 'vg-stick-r-dot');
+    }
+
+    setupStick(containerId, axisX, axisY, dotId) {
+        const container = document.getElementById(containerId);
+        const dot = document.getElementById(dotId);
+        if (!container || !dot) return;
+
+        let activeRect = null;
+        let activeTouchId = null;
+
+        const updateStick = (clientX, clientY) => {
+            const rect = activeRect || container.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const radius = rect.width / 2;
+
+            let dx = clientX - centerX;
+            let dy = clientY - centerY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist > radius) {
+                dx *= radius / dist;
+                dy *= radius / dist;
+            }
+
+            // Map to -32768..32767
+            this.state.axes[axisX] = Math.round((dx / radius) * 32767);
+            this.state.axes[axisY] = Math.round((dy / radius) * 32767);
+
+            // Visuals
+            dot.style.transform = `translate(${dx}px, ${dy}px)`;
+        };
+
+        const handleMove = (e) => {
+            if (e.cancelable) e.preventDefault();
+            
+            let touch = null;
+            if (e.touches) {
+                // Find the touch that matches our activeTouchId
+                for (let i = 0; i < e.touches.length; i++) {
+                    if (e.touches[i].identifier === activeTouchId) {
+                        touch = e.touches[i];
+                        break;
+                    }
+                }
+            } else {
+                touch = e;
+            }
+
+            if (touch) {
+                updateStick(touch.clientX, touch.clientY);
+            }
+        };
+
+        const handleEnd = (e) => {
+            if (e && e.changedTouches) {
+                let match = false;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeTouchId) {
+                        match = true;
+                        break;
+                    }
+                }
+                if (!match) return; // Not our finger
+            }
+
+            if (e && e.cancelable) e.preventDefault();
+            activeRect = null;
+            activeTouchId = null;
+            this.state.axes[axisX] = 0;
+            this.state.axes[axisY] = 0;
+            dot.style.transform = 'translate(0,0)';
+        };
+
+        container.addEventListener('touchstart', (e) => {
+            if (activeTouchId !== null) return;
+            const touch = e.changedTouches[0];
+            activeTouchId = touch.identifier;
+            activeRect = container.getBoundingClientRect();
+            updateStick(touch.clientX, touch.clientY);
+        });
+
+        container.addEventListener('touchmove', handleMove, { passive: false });
+        container.addEventListener('touchend', handleEnd);
+        container.addEventListener('touchcancel', handleEnd);
+        
+        container.addEventListener('mousedown', (e) => {
+            activeRect = container.getBoundingClientRect();
+            const onMouseMove = (me) => updateStick(me.clientX, me.clientY);
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                handleEnd();
+            };
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            updateStick(e.clientX, e.clientY);
+        });
+    }
+
+    async startSyncLoop() {
+        if (this.syncBusy) return;
+        this.syncBusy = true;
+
+        try {
+            this.manageSocket();
+
+            const modeEl = document.getElementById('cfg-input-mode');
+            const currentMode = modeEl ? modeEl.value : null;
+            
+            if (currentMode === 'virtual_gamepad') {
+                const currentStateStr = JSON.stringify(this.state);
+                if (currentStateStr !== this.lastSentState) {
+                    this.lastSentState = currentStateStr;
+                    
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(currentStateStr);
+                    } else {
+                        // Fallback to HTTP if WS not ready
+                        await api('inject', 'POST', this.state);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('VG Sync Error:', e);
+        } finally {
+            this.syncBusy = false;
+            // 60Hz Throttle
+            setTimeout(() => this.startSyncLoop(), 16);
+        }
+    }
 }

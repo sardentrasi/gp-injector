@@ -13,7 +13,8 @@ By connecting the Raspberry Pi's TX/RX pins directly to the RP2040 board, GP-Inj
 ## ✨ Key Features
 
 - 🌐 **Modern Web Dashboard:** Manage your entire configuration via a responsive, glassmorphism-styled Web UI (Complete with Light & Dark modes).
-- 🕹️ **Dual Mode (Gamepad / KBM):** Play your games using a native PS4/PS5/Xbox controller, or easily switch to Keyboard and Mouse configuration.
+- 📱 **Virtual Gamepad:** Don't have a physical controller? Open the dashboard on your phone and use the high-fidelity Virtual Gamepad tab to play.
+- 🕹️ **Multi-Input Support:** Seamlessly switch between physical Gamepad, Keyboard/Mouse, or Virtual Pad modes.
 - 🔧 **Deep Customization:**
   - **Button Remapping:** Remap any paddle or button.
   - **Anti-Recoil:** Dynamically adjusts right-stick pitch automatically when triggers are pulled.
@@ -21,7 +22,10 @@ By connecting the Raspberry Pi's TX/RX pins directly to the RP2040 board, GP-Inj
   - **Analog Curves & Deadzones:** Fine-tune radial deadzones and apply Exponential or S-Curve multipliers.
 - 🤖 **Smart Auto-Detection:** Intelligently skips false DualSense event nodes (like Touchpad or Motion sensors) to instantly map onto the primary Gamepad device at boot.
 - ⚙️ **Automated Web Config Bypass:** Directly enter GP2040-CE's native web configurator without holding physical hardware buttons. The Pi securely orchestrates the boot loop via GPIO, featuring an intelligent polling mechanism to safely avoid Windows RNDIS network port conflicts.
-- ⏱️ **Ultra-Low Latency:** Relies on a non-blocking `select`-based polling loop locked at 250Hz minimum to guarantee crisp input delivery and prevent PS5 authentication timeouts.
+- ⏱️ **Zero-Latency Architecture:**
+  - **WebSocket Powered:** Virtual input uses persistent WebSocket pipes to bypass HTTP overhead.
+  - **Smart Caching:** Profile data is cached to ensure the 250Hz main loop runs with nearly zero CPU overhead during gameplay.
+  - **Hibernation Mode:** Background UI updates are suspended when using the Virtual Pad to focus all resources on input.
 
 ## 📦 Requirements
 
@@ -34,7 +38,7 @@ By connecting the Raspberry Pi's TX/RX pins directly to the RP2040 board, GP-Inj
 ### Python Dependencies
 
 ```bash
-pip install pyserial flask evdev
+pip install pyserial flask flask-sock evdev
 ```
 
 ## 🚀 Installation & Usage

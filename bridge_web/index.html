@@ -49,6 +49,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
             <span>GP2040 GUI</span>
         </li>
+        <li class="nav-item" data-tab="virtual" id="nav-virtual">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4m-2-2v4m7-2h2m-1-1v2m-6-2h.01m2.99 0h.01"/></svg>
+            <span>Virtual Gamepad</span>
+        </li>
         <li class="nav-item" data-tab="settings" id="nav-settings">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span>Settings</span>
@@ -81,9 +85,9 @@
         <div class="card signal-chain-card">
             <div class="signal-chain">
                 <div class="signal-node">
-                    <div class="signal-icon">🎮</div>
-                    <div class="signal-label">Gamepad</div>
-                    <div class="signal-sub" id="signal-gamepad">Not connected</div>
+                    <div class="signal-icon" id="signal-gamepad-icon">🎮</div>
+                    <div class="signal-label" id="signal-gamepad-label">Gamepad</div>
+                    <div class="signal-sub" id="signal-gamepad-sub">Not connected</div>
                 </div>
                 <div class="signal-arrow">
                     <svg viewBox="0 0 40 12"><path d="M0 6h34l-4-4M34 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
@@ -282,6 +286,49 @@
             <h1>Stick Tuning</h1>
             <p class="tab-subtitle">Deadzone & sensitivity curve</p>
         </div>
+        <style>
+            .stick-visualizer {
+                width: 180px; height: 180px;
+                border-radius: 50%;
+                margin: 20px auto 10px;
+                position: relative;
+                background: var(--bg-card);
+                border: 2px solid var(--border-subtle);
+                box-shadow: inset 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .stick-visualizer::before, .stick-visualizer::after {
+                content: ''; position: absolute; background: var(--border-subtle);
+            }
+            .stick-visualizer::before { top: 0; bottom: 0; left: 50%; width: 1px; }
+            .stick-visualizer::after { left: 0; right: 0; top: 50%; height: 1px; }
+            
+            .stick-dot {
+                position: absolute;
+                width: 14px; height: 14px;
+                border-radius: 50%;
+                transform: translate(-50%, -50%);
+                pointer-events: none;
+                transition: left 0.03s linear, top 0.03s linear;
+                left: 50%; top: 50%;
+            }
+            .stick-dot.raw {
+                border: 2px solid var(--text-muted);
+                z-index: 5;
+            }
+            .stick-dot.processed {
+                background-color: var(--accent-green);
+                box-shadow: 0 0 8px var(--accent-green);
+                border: 1px solid var(--accent-darkgreen);
+                z-index: 10;
+            }
+            .vis-legend {
+                display: flex; justify-content: center; gap: 15px;
+                font-size: 12px; color: var(--text-primary); margin-bottom: 20px;
+            }
+            .vis-legend-item { display: flex; align-items: center; gap: 5px; }
+            .vis-legend-raw { width: 10px; height: 10px; border: 2px solid var(--text-muted); border-radius: 50%; }
+            .vis-legend-proc { width: 10px; height: 10px; background-color: var(--accent-green); border: 1px solid var(--accent-darkgreen); border-radius: 50%; }
+        </style>
         <div class="row">
             <!-- Left Stick -->
             <div class="card card-half">
@@ -308,6 +355,16 @@
                         <span class="slider-value" id="mult-left-val">1.0x</span>
                     </div>
                 </div>
+                
+                <div class="stick-visualizer" id="vis-left">
+                    <div class="stick-dot raw" id="dot-left-raw"></div>
+                    <div class="stick-dot processed" id="dot-left-proc"></div>
+                </div>
+                <div class="vis-legend">
+                    <div class="vis-legend-item"><div class="vis-legend-raw"></div><span>Raw</span></div>
+                    <div class="vis-legend-item"><div class="vis-legend-proc"></div><span>Processed</span></div>
+                </div>
+
                 <canvas id="curve-canvas-left" width="240" height="180" class="curve-canvas"></canvas>
             </div>
             <!-- Right Stick -->
@@ -335,10 +392,21 @@
                         <span class="slider-value" id="mult-right-val">1.0x</span>
                     </div>
                 </div>
+
+                <div class="stick-visualizer" id="vis-right">
+                    <div class="stick-dot raw" id="dot-right-raw"></div>
+                    <div class="stick-dot processed" id="dot-right-proc"></div>
+                </div>
+                <div class="vis-legend">
+                    <div class="vis-legend-item"><div class="vis-legend-raw"></div><span>Raw</span></div>
+                    <div class="vis-legend-item"><div class="vis-legend-proc"></div><span>Processed</span></div>
+                </div>
+
                 <canvas id="curve-canvas-right" width="240" height="180" class="curve-canvas"></canvas>
             </div>
         </div>
         <div class="card-actions" style="margin-top:12px">
+            <button class="btn btn-secondary" onclick="resetSticks()">Restore Default</button>
             <button class="btn btn-primary" onclick="saveProfile()">Save Stick Settings</button>
         </div>
     </section>
@@ -441,6 +509,85 @@
         </div>
     </section>
 
+    <!-- ===== VIRTUAL GAMEPAD TAB ===== -->
+    <section id="tab-virtual" class="tab-content">
+        <div class="tab-header">
+            <h1>Virtual Gamepad</h1>
+            <p class="tab-subtitle">Touch-friendly controller interface</p>
+        </div>
+        
+        <div class="virtual-gamepad-container" id="vg-container">
+            <!-- Mode Warning Overlay -->
+            <div id="vg-mode-warning" class="vg-overlay" style="display: none;">
+                <div class="vg-overlay-content">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <h2>Input Mode Mismatch</h2>
+                    <p>You must select <b>Virtual Gamepad</b> in Settings to use this feature.</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('nav-settings').click()">Go to Settings</button>
+                </div>
+            </div>
+
+            <!-- Gamepad Layout -->
+            <div class="vg-layout">
+                <!-- Top Row: Triggers & Bumpers -->
+                <div class="vg-row vg-top">
+                    <div class="vg-trigger-group left">
+                        <button class="vg-btn vg-shoulder" data-btn="LB">LB</button>
+                        <button class="vg-btn vg-trigger" data-btn="LT_DIGITAL">LT</button>
+                    </div>
+                    <div class="vg-spacer"></div>
+                    <div class="vg-trigger-group right">
+                        <button class="vg-btn vg-shoulder" data-btn="RB">RB</button>
+                        <button class="vg-btn vg-trigger" data-btn="RT_DIGITAL">RT</button>
+                    </div>
+                </div>
+
+                <!-- Main Row: Sticks & Buttons -->
+                <div class="vg-row vg-main">
+                    <!-- Left Zone: Stick L & DPad -->
+                    <div class="vg-zone vg-left">
+                        <div class="vg-stick-outer" id="vg-stick-l">
+                            <div class="vg-stick-inner" id="vg-stick-l-dot"></div>
+                        </div>
+                        <div class="vg-dpad">
+                            <button class="vg-btn vg-dpad-btn up" data-dpad="up">▲</button>
+                            <button class="vg-btn vg-dpad-btn left" data-dpad="left">◄</button>
+                            <div class="vg-dpad-center"></div>
+                            <button class="vg-btn vg-dpad-btn right" data-dpad="right">►</button>
+                            <button class="vg-btn vg-dpad-btn down" data-dpad="down">▼</button>
+                        </div>
+                    </div>
+
+                    <!-- Center Zone: System Buttons -->
+                    <div class="vg-zone vg-center">
+                        <div class="vg-sys-btns">
+                            <button class="vg-btn vg-rect" data-btn="BACK">BACK</button>
+                            <button class="vg-btn vg-circle" data-btn="HOME">H</button>
+                            <button class="vg-btn vg-rect" data-btn="START">START</button>
+                        </div>
+                        <div class="vg-stick-btns">
+                            <button class="vg-btn vg-stick-btn" data-btn="L3">L3</button>
+                            <button class="vg-btn vg-stick-btn" data-btn="R3">R3</button>
+                        </div>
+                    </div>
+
+                    <!-- Right Zone: ABXY & Stick R -->
+                    <div class="vg-zone vg-right">
+                        <div class="vg-abxy">
+                            <button class="vg-btn vg-face y" data-btn="Y">Y</button>
+                            <button class="vg-btn vg-face x" data-btn="X">X</button>
+                            <button class="vg-btn vg-face b" data-btn="B">B</button>
+                            <button class="vg-btn vg-face a" data-btn="A">A</button>
+                        </div>
+                        <div class="vg-stick-outer" id="vg-stick-r">
+                            <div class="vg-stick-inner" id="vg-stick-r-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- ===== SETTINGS TAB ===== -->
     <section id="tab-settings" class="tab-content">
         <div class="tab-header">
@@ -456,6 +603,7 @@
                 <select id="cfg-input-mode" class="select-input">
                     <option value="gamepad">Gamepad</option>
                     <option value="kb_mouse">Keyboard & Mouse</option>
+                    <option value="virtual_gamepad">Virtual Gamepad</option>
                 </select>
             </div>
             <hr class="divider">
