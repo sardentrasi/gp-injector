@@ -27,12 +27,10 @@ let webConfigPingTimer = null;
 document.addEventListener('DOMContentLoaded', () => {
     setupTheme();
     setupNavigation();
-    buildButtonGrid();
     buildRemapGrid();
     buildTurboGrid();
     buildActivationDropdown();
     setupSliderLabels();
-    setupInputModeToggle();
     loadConfig();
     loadProfile();
     loadProfiles();
@@ -46,10 +44,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function applyTabSpecifics() {
-    const mode = document.getElementById('cfg-input-mode').value;
     const warning = document.getElementById('vg-mode-warning');
     if (warning) {
-        warning.style.display = (mode === 'virtual_gamepad') ? 'none' : 'flex';
+        warning.style.display = 'none'; 
     }
 }
 
@@ -80,17 +77,16 @@ function setupTheme() {
                 document.getElementById('theme-icon-sun').style.display = 'none';
                 document.getElementById('theme-icon-moon').style.display = 'block';
             }
-            // Redraw canvases with new theme colors
+            // Redraw curves with new theme colors
             drawCurve('left');
             drawCurve('right');
-            drawStick('canvas-left-stick', 0, 0);
-            drawStick('canvas-right-stick', 0, 0);
         });
     }
 }
 
 let currentActiveTab = 'dashboard';
-
+let liveSocket = null;
+let currentStreamSlot = '1';
 /* ============================================================
    NAVIGATION
    ============================================================ */
@@ -174,7 +170,8 @@ function startPolling() {
 }
 
 async function pollStatus() {
-    const data = await api('status');
+    const viewSlot = document.getElementById('live-slot-selector')?.value || '1';
+    const data = await api(`status?slot=${viewSlot}`);
     if (!data) return;
 
     const dot = document.getElementById('status-dot');
@@ -206,101 +203,195 @@ async function pollStatus() {
     }
 
     // Show gamepad device info in signal chain
-    if (data.input_mode === 'virtual_gamepad') {
-        gamepadIcon.textContent = '📱';
-        gamepadLabel.textContent = 'Virtual Pad';
-        gamepadSub.textContent = data.running ? 'Connected' : 'Ready';
-        gamepadSub.title = 'Web-based input active';
-    } else if (data.input_mode === 'kb_mouse') {
-        gamepadIcon.textContent = '⌨️';
-        gamepadLabel.textContent = 'KB & Mouse';
-        gamepadSub.textContent = data.running ? 'Active' : 'Ready';
+    let activeSlotCount = 0;
+    if (data.multi_slots) {
+        data.multi_slots.forEach(s => { if (s && s.enabled) activeSlotCount++; });
+    }
+
+    // Show gamepad device info in signal chain
+    if (activeSlotCount >= 2) {
+        gamepadIcon.textContent = '🎮'.repeat(activeSlotCount);
+        gamepadLabel.textContent = `${activeSlotCount} Gamepads`;
+        gamepadSub.textContent = data.running ? 'Multi-Slot Active' : 'Ready';
+        gamepadSub.title = '';
     } else {
-        gamepadIcon.textContent = '🎮';
-        gamepadLabel.textContent = 'Gamepad';
-        if (data.device_info && data.device_info.name) {
-            gamepadSub.textContent = data.device_info.name;
-            gamepadSub.title = data.device_info.path || '';
+        let activeSlotCfg = data.multi_slots ? data.multi_slots.find(s => s && s.enabled) : null;
+        let mode = activeSlotCfg ? activeSlotCfg.input_mode : 'gamepad';
+        
+        if (mode === 'virtual_gamepad') {
+            gamepadIcon.textContent = '📱';
+            gamepadLabel.textContent = 'Virtual Pad';
+            gamepadSub.textContent = data.running ? 'Connected' : 'Ready';
+            gamepadSub.title = 'Web-based input active';
+        } else if (mode === 'kb_mouse') {
+            gamepadIcon.textContent = '⌨️';
+            gamepadLabel.textContent = 'KB & Mouse';
+            gamepadSub.textContent = data.running ? 'Active' : 'Ready';
         } else {
-            gamepadSub.textContent = data.running ? 'Connecting...' : 'Not connected';
+            gamepadIcon.textContent = '🎮';
+            gamepadLabel.textContent = 'Gamepad';
+            if (data.device_info && data.device_info.name) {
+                gamepadSub.textContent = data.device_info.name;
+                gamepadSub.title = data.device_info.path || '';
+            } else {
+                gamepadSub.textContent = data.running ? 'Connecting...' : 'Not connected';
+            }
         }
     }
 
     document.getElementById('sidebar-active-profile').textContent = data.active_profile || 'Default';
 
+    // Update Status Cards
+    const container = document.getElementById('multi-status-container');
+    if (container && data.multi_slots) {
+        let html = '';
+        for (let i = 0; i < 4; i++) {
+            const slotId = i + 1;
+            const slotCfg = data.multi_slots[i];
+            if (!slotCfg || !slotCfg.enabled) continue;
+            
+            const w = data.workers && data.workers[slotId] ? data.workers[slotId] : null;
+            const isRunning = w && w.running;
+            
+            let icon = '🎮';
+            let label = 'Gamepad';
+            let subtext = 'Not connected';
+            if (slotCfg.input_mode === 'virtual_gamepad') {
+                icon = '📱';
+                label = 'Virtual Pad';
+                subtext = isRunning ? 'Connected' : 'Ready';
+            } else if (slotCfg.input_mode === 'kb_mouse') {
+                icon = '⌨️';
+                label = 'KB & Mouse';
+                subtext = isRunning ? 'Active' : 'Ready';
+            } else {
+                if (w && w.device_info && w.device_info.name) {
+                    subtext = w.device_info.name;
+                } else {
+                    subtext = isRunning ? 'Connecting...' : 'Not connected';
+                }
+            }
+            
+            const borderColor = isRunning ? 'var(--success-color)' : 'var(--danger-color)';
+            const badgeColor = isRunning ? 'var(--success-color)' : 'var(--danger-color)';
+            html += `
+                <div class="card" style="flex: 1 1 200px; padding: 15px; border-top: 4px solid ${borderColor};">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                        <h3 style="margin:0;">Slot ${slotId}</h3>
+                        <span style="font-size:12px; padding:3px 8px; border-radius:12px; background-color:${badgeColor}20; color:${badgeColor}; font-weight:bold;">
+                            ${isRunning ? 'Running' : 'Stopped'}
+                        </span>
+                    </div>
+                    <div style="font-size:13px; margin-bottom: 10px; color:var(--text-muted); display:flex; align-items:center; gap:5px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                        ${slotCfg.serial_port}
+                    </div>
+                    <div style="display:flex; align-items:center; gap: 10px;">
+                        <span style="font-size:28px;">${icon}</span>
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-weight:600; font-size:14px; text-transform:capitalize;">${label}</span>
+                            <span style="font-size:12px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;" title="${subtext}">${subtext}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        if (html === '') {
+            html = '<div style="color:var(--text-muted); padding:10px;">No slots are enabled. Settings > Enable a slot.</div>';
+        }
+        container.innerHTML = html;
+    }
+
+    // Update Live Viewer
     if (data.state && (currentActiveTab === 'dashboard' || currentActiveTab === 'sticks')) {
         updateLiveViewer(data.state);
     }
 
     // Only fetch/update logs if we are on the dashboard
     if (currentActiveTab === 'dashboard') {
-        const logData = await api('logs');
+        const viewSlot = document.getElementById('live-slot-selector')?.value || '1';
+        const logData = await api(`logs?slot=${viewSlot}`);
         if (logData && logData.logs) {
             updateLogs(logData.logs);
         }
     }
 }
 
+function manageLiveStream() {
+    if (liveSocket) {
+        liveSocket.close();
+        liveSocket = null;
+    }
+    
+    if (isBridgeRunning && (currentActiveTab === 'dashboard' || currentActiveTab === 'sticks')) {
+        const viewSlot = document.getElementById('live-slot-selector')?.value || '1';
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/state?slot=${viewSlot}`;
+        
+        console.log("[*] Opening telemetry WebSocket for slot " + viewSlot);
+        liveSocket = new WebSocket(wsUrl);
+        liveSocket.onmessage = (e) => {
+            try {
+                const state = JSON.parse(e.data);
+                if (state.stopped) {
+                    if (liveSocket) { liveSocket.close(); liveSocket = null; }
+                    return;
+                }
+                updateLiveViewer(state);
+            } catch (err) {}
+        };
+        liveSocket.onerror = () => {
+            if (liveSocket) { liveSocket.close(); liveSocket = null; }
+        };
+    }
+}
+
+function changeLiveSlot() {
+    // If bridge is running, manageLiveStream will restart EventSource with the new slot query.
+    manageLiveStream();
+    pollStatus();
+}
+
+function changeVgSlot() {
+    // Just force a sync logic update in the class (it reads from UI each tick).
+}
+
 
 /* ============================================================
    LIVE INPUT VIEWER
    ============================================================ */
-function buildButtonGrid() {
-    const grid = document.getElementById('button-grid');
-    grid.innerHTML = '';
-    BUTTON_NAMES.forEach(btn => {
-        const el = document.createElement('div');
-        el.className = 'btn-indicator';
-        el.id = 'btn-ind-' + btn;
-        el.textContent = BUTTON_DISPLAY[btn] || btn;
-        grid.appendChild(el);
-    });
-}
 
 function updateLiveViewer(state) {
     if (!state) return;
 
     // Sticks
     const axes = state.processed_axes || state.axes || {};
-    drawStick('canvas-left-stick', axes.lx || 0, axes.ly || 0);
-    drawStick('canvas-right-stick', axes.rx || 0, axes.ry || 0);
+    const rad = 35; // 35px visual bounded radius
+    const mapAxis = (val) => (val / 32768.0) * rad;
 
-    document.getElementById('lx-val').textContent = axes.lx || 0;
-    document.getElementById('ly-val').textContent = axes.ly || 0;
-    document.getElementById('rx-val').textContent = axes.rx || 0;
-    document.getElementById('ry-val').textContent = axes.ry || 0;
+    const stickL = document.getElementById('lv-stick-l-dot');
+    if (stickL) stickL.style.transform = `translate(${mapAxis(axes.lx || 0)}px, ${mapAxis(axes.ly || 0)}px)`;
 
-    // Triggers
-    const lt = axes.lt || 0;
-    const rt = axes.rt || 0;
-    document.getElementById('lt-bar').style.width = (lt / 255 * 100) + '%';
-    document.getElementById('rt-bar').style.width = (rt / 255 * 100) + '%';
-    document.getElementById('lt-val').textContent = lt;
-    document.getElementById('rt-val').textContent = rt;
+    const stickR = document.getElementById('lv-stick-r-dot');
+    if (stickR) stickR.style.transform = `translate(${mapAxis(axes.rx || 0)}px, ${mapAxis(axes.ry || 0)}px)`;
 
     // Buttons
     const buttons = state.processed_buttons || state.buttons || {};
-    BUTTON_NAMES.forEach(btn => {
-        const el = document.getElementById('btn-ind-' + btn);
+    for (const [btnName, isPressed] of Object.entries(buttons)) {
+        const el = document.getElementById('lv-btn-' + btnName);
         if (el) {
-            if (buttons[btn]) {
-                el.classList.add('pressed');
-            } else {
-                el.classList.remove('pressed');
-            }
+            if (isPressed) el.classList.add('active');
+            else el.classList.remove('active');
         }
-    });
+    }
 
     // DPad
     const dpad = state.dpad || {};
     ['up', 'down', 'left', 'right'].forEach(dir => {
-        const el = document.getElementById('dpad-' + dir);
+        const el = document.getElementById('lv-dpad-' + dir);
         if (el) {
-            if (dpad[dir]) {
-                el.classList.add('active');
-            } else {
-                el.classList.remove('active');
-            }
+            if (dpad[dir]) el.classList.add('active');
+            else el.classList.remove('active');
         }
     });
 }
@@ -505,21 +596,133 @@ async function cancelWebConfig() {
 async function loadConfig() {
     const data = await api('config');
     if (!data) return;
-    document.getElementById('cfg-serial').value = data.serial_port || '/dev/ttyAMA0';
     document.getElementById('cfg-baud').value = data.baud_rate || 500000;
-    document.getElementById('cfg-device').value = data.device_path || 'auto';
-    document.getElementById('cfg-keyboard').value = data.keyboard_device || '';
-    document.getElementById('cfg-mouse').value = data.mouse_device || '';
-    document.getElementById('cfg-input-mode').value = data.input_mode || 'gamepad';
     document.getElementById('cfg-debug-interval').value = data.debug_interval || 0.5;
-    updateInputModeUI();
+    
+    // Inject parsed profile list into multi cards builder
+    const profileNames = Object.keys(data.profiles || {});
+    buildMultiCards(data.multi_slots || [], profileNames);
 }
 
-function updateInputModeUI() {
-    const mode = document.getElementById('cfg-input-mode').value;
-    const gamepadRow = document.getElementById('row-cfg-device');
-    const kbRow = document.getElementById('row-cfg-kb');
-    const mouseRow = document.getElementById('row-cfg-mouse');
+function buildMultiCards(slotsData, profileList) {
+    const container = document.getElementById('settings-slots-box');
+    if (!container) return;
+    
+    let html = '<h2 class="card-title" style="margin-bottom: 15px;">Slot Configuration</h2>';
+    html += '<div style="display: flex; flex-wrap: wrap; gap: 15px;">';
+    
+    for (let i = 0; i < 4; i++) {
+        const slot = slotsData[i] || {};
+        const enabled = slot.enabled || false;
+        const assignedProfile = slot.profile || 'Default';
+        const inputMode = slot.input_mode || 'gamepad';
+        const serialPort = slot.serial_port || `/dev/ttyS${i+1}`;
+        const devicePath = slot.device_path || 'auto';
+        
+        let profileOptions = '';
+        if (profileList && profileList.length > 0) {
+            profileList.forEach(pName => {
+                profileOptions += `<option value="${pName}" ${assignedProfile === pName ? 'selected' : ''}>${escapeHtml(pName)}</option>`;
+            });
+        } else {
+            profileOptions = `<option value="Default">Default</option>`;
+        }
+
+        html += `
+            <div class="card" style="box-sizing: border-box; flex: 1 1 calc(50% - 15px); min-width: 320px; margin-bottom: 0; padding: 15px; border-left: 4px solid var(--primary-color);">
+                <div class="setting-row" style="padding-top:0;">
+                    <h3 style="margin:0;">Slot ${i+1}</h3>
+                    <label class="toggle-switch">
+                        <input type="checkbox" class="slot-enable-toggle" id="cfg-m-enabled-${i}" ${enabled ? 'checked' : ''} onchange="enforceAtLeastOneSlot(this)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+
+                <div class="setting-row" style="padding: 8px 0;">
+                    <div class="setting-label">
+                        <h4 style="margin:0; font-size: 13px;">Input Mode</h4>
+                    </div>
+                    <select id="cfg-m-input-${i}" class="select-input" style="font-size: 13px; padding: 4px 8px; box-sizing: border-box; width: 170px;" onchange="updateMultiInputModeUI(${i})">
+                        <option value="gamepad" ${inputMode === 'gamepad' ? 'selected' : ''}>Gamepad</option>
+                        <option value="kb_mouse" ${inputMode === 'kb_mouse' ? 'selected' : ''}>Keyboard & Mouse</option>
+                        <option value="virtual_gamepad" ${inputMode === 'virtual_gamepad' ? 'selected' : ''}>Virtual Gamepad</option>
+                    </select>
+                </div>
+                
+                <div class="setting-row" id="row-cfg-m-device-${i}" style="padding: 8px 0;">
+                    <div class="setting-label">
+                        <h4 style="margin:0; font-size: 13px;">Gamepad Device</h4>
+                    </div>
+                    <div class="device-select-group">
+                        <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 12px;" onclick="detectDevices('gamepad', ${i})">Detect</button>
+                        <input type="text" id="cfg-m-device-${i}" class="text-input" style="font-size: 13px; padding: 4px 8px; box-sizing: border-box; width: 170px; flex: 0 0 170px;" value="${devicePath}">
+                    </div>
+                </div>
+                <div id="detected-devices-gamepad-${i}" class="detected-devices" style="display:none; font-size:12px;"></div>
+                
+                <div class="setting-row kbmouse-only-setting" id="row-cfg-m-kb-${i}" style="display:none; padding: 8px 0;">
+                    <div class="setting-label">
+                        <h4 style="margin:0; font-size: 13px;">Keyboard</h4>
+                    </div>
+                    <div class="device-select-group">
+                        <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 12px;" onclick="detectDevices('keyboard', ${i})">Detect</button>
+                        <input type="text" id="cfg-m-kb-${i}" class="text-input" style="font-size: 13px; padding: 4px 8px; box-sizing: border-box; width: 170px; flex: 0 0 170px;" value="${slot.keyboard_device || ''}" placeholder="/dev/input/eventX">
+                    </div>
+                </div>
+                <div id="detected-devices-keyboard-${i}" class="detected-devices" style="display:none; font-size:12px;"></div>
+
+                <div class="setting-row kbmouse-only-setting" id="row-cfg-m-mouse-${i}" style="display:none; padding: 8px 0;">
+                    <div class="setting-label">
+                        <h4 style="margin:0; font-size: 13px;">Mouse</h4>
+                    </div>
+                    <div class="device-select-group">
+                        <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 12px;" onclick="detectDevices('mouse', ${i})">Detect</button>
+                        <input type="text" id="cfg-m-mouse-${i}" class="text-input" style="font-size: 13px; padding: 4px 8px; box-sizing: border-box; width: 170px; flex: 0 0 170px;" value="${slot.mouse_device || ''}" placeholder="/dev/input/eventY">
+                    </div>
+                </div>
+                <div id="detected-devices-mouse-${i}" class="detected-devices" style="display:none; font-size:12px;"></div>
+
+                <div class="setting-row" style="padding: 8px 0;">
+                    <div class="setting-label">
+                        <h4 style="margin:0; font-size: 13px;">Serial Port</h4>
+                    </div>
+                    <div class="device-select-group">
+                        <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 12px;" onclick="detectDevices('serial', ${i})">Detect</button>
+                        <input type="text" id="cfg-m-serial-${i}" class="text-input" style="font-size: 13px; padding: 4px 8px; box-sizing: border-box; width: 170px; flex: 0 0 170px;" value="${serialPort}">
+                    </div>
+                </div>
+                <div id="detected-devices-serial-${i}" class="detected-devices" style="display:none; font-size:12px;"></div>
+
+                <div class="setting-row" style="padding: 8px 0; border-bottom: none;">
+                    <div class="setting-label">
+                        <h4 style="margin:0; font-size: 13px;">Assigned Profile</h4>
+                    </div>
+                    <select id="cfg-m-profile-${i}" class="select-input" style="font-size: 13px; padding: 4px 8px; box-sizing: border-box; width: 170px;">
+                        ${profileOptions}
+                    </select>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+
+    
+    // Set initial display
+    for (let i = 0; i < 4; i++) {
+        updateMultiInputModeUI(i);
+    }
+}
+
+function updateMultiInputModeUI(idx) {
+    const mode = document.getElementById(`cfg-m-input-${idx}`)?.value;
+    const gamepadRow = document.getElementById(`row-cfg-m-device-${idx}`);
+    const kbRow = document.getElementById(`row-cfg-m-kb-${idx}`);
+    const mouseRow = document.getElementById(`row-cfg-m-mouse-${idx}`);
+    if (!mode) return;
+    
     if (mode === 'kb_mouse') {
         gamepadRow.style.display = 'none';
         kbRow.style.display = 'flex';
@@ -533,22 +736,48 @@ function updateInputModeUI() {
         kbRow.style.display = 'none';
         mouseRow.style.display = 'none';
     }
-    applyTabSpecifics();
 }
 
-function setupInputModeToggle() {
-    const el = document.getElementById('cfg-input-mode');
-    if (el) el.addEventListener('change', updateInputModeUI);
+function enforceAtLeastOneSlot(checkboxRef) {
+    if (!checkboxRef.checked) {
+        let count = 0;
+        document.querySelectorAll('.slot-enable-toggle').forEach(el => {
+            if (el.checked) count++;
+        });
+        if (count === 0) {
+            checkboxRef.checked = true; // Rollback
+            toast('Minimum 1 slot is required to use the bridge.', 'warning');
+        }
+    }
 }
 
 async function saveSettings() {
+    const multiSlots = [];
+    let enabledCount = 0;
+    
+    for (let i=0; i<4; i++) {
+        const elEnabled = document.getElementById(`cfg-m-enabled-${i}`);
+        if (!elEnabled) break;
+        if (elEnabled.checked) enabledCount++;
+        multiSlots.push({
+            enabled: elEnabled.checked,
+            profile: document.getElementById(`cfg-m-profile-${i}`).value,
+            input_mode: document.getElementById(`cfg-m-input-${i}`).value,
+            device_path: document.getElementById(`cfg-m-device-${i}`).value,
+            keyboard_device: document.getElementById(`cfg-m-kb-${i}`).value,
+            mouse_device: document.getElementById(`cfg-m-mouse-${i}`).value,
+            serial_port: document.getElementById(`cfg-m-serial-${i}`).value
+        });
+    }
+
+    if (enabledCount === 0) {
+        toast('You must enable at least 1 slot!', 'error');
+        return;
+    }
+
     const data = {
-        serial_port: document.getElementById('cfg-serial').value,
+        multi_slots: multiSlots,
         baud_rate: parseInt(document.getElementById('cfg-baud').value) || 500000,
-        device_path: document.getElementById('cfg-device').value,
-        keyboard_device: document.getElementById('cfg-keyboard').value,
-        mouse_device: document.getElementById('cfg-mouse').value,
-        input_mode: document.getElementById('cfg-input-mode').value,
         debug_interval: parseFloat(document.getElementById('cfg-debug-interval').value) || 0.5
     };
     const res = await api('config', 'POST', data);
@@ -559,10 +788,10 @@ async function saveSettings() {
     }
 }
 
-async function detectDevices(type) {
-    const res = await api('devices');
-    const containerId = type === 'gamepad' ? 'detected-devices-gamepad' : type === 'keyboard' ? 'detected-devices-keyboard' : 'detected-devices-mouse';
-    const inputId = type === 'gamepad' ? 'cfg-device' : type === 'keyboard' ? 'cfg-keyboard' : 'cfg-mouse';
+async function detectDevices(type, idx) {
+    const res = type === 'serial' ? await api('serial_ports') : await api('devices');
+    const containerId = type === 'serial' ? `detected-devices-serial-${idx}` : type === 'gamepad' ? `detected-devices-gamepad-${idx}` : type === 'keyboard' ? `detected-devices-keyboard-${idx}` : `detected-devices-mouse-${idx}`;
+    const inputId = type === 'serial' ? `cfg-m-serial-${idx}` : type === 'gamepad' ? `cfg-m-device-${idx}` : type === 'keyboard' ? `cfg-m-kb-${idx}` : `cfg-m-mouse-${idx}`;
 
     const container = document.getElementById(containerId);
     if (!res || !res.devices || res.devices.length === 0) {
@@ -1375,20 +1604,19 @@ class VirtualGamepad {
         try {
             this.manageSocket();
 
-            const modeEl = document.getElementById('cfg-input-mode');
-            const currentMode = modeEl ? modeEl.value : null;
+            const targetSlot = document.getElementById('vg-slot-selector')?.value || '1';
             
-            if (currentMode === 'virtual_gamepad') {
-                const currentStateStr = JSON.stringify(this.state);
-                if (currentStateStr !== this.lastSentState) {
-                    this.lastSentState = currentStateStr;
-                    
-                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                        this.ws.send(currentStateStr);
-                    } else {
-                        // Fallback to HTTP if WS not ready
-                        await api('inject', 'POST', this.state);
-                    }
+            // Send virtual input
+            this.state._slot = parseInt(targetSlot);
+            const currentStateStr = JSON.stringify(this.state);
+            if (currentStateStr !== this.lastSentState) {
+                this.lastSentState = currentStateStr;
+                
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(currentStateStr);
+                } else {
+                    // Fallback to HTTP if WS not ready
+                    await api('inject', 'POST', this.state);
                 }
             }
         } catch (e) {

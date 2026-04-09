@@ -1380,3 +1380,79 @@ h1, h2, h3, h4 {
     .vg-face.y, .vg-face.a { left: 48px; }
     .vg-face.x, .vg-face.b { top: 48px; }
 }
+/* Compact Live Viewer for Dashboard */
+.lv-layout.lv-compact {
+    gap: 12px;
+    height: auto;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.lv-layout.lv-compact .vg-main {
+    margin-top: 10px;
+}
+
+.lv-layout.lv-compact .vg-zone {
+    gap: 20px;
+}
+
+.lv-layout.lv-compact .vg-stick-outer {
+    width: 130px;
+    height: 130px;
+}
+
+.lv-layout.lv-compact .vg-stick-inner {
+    width: 56px;
+    height: 56px;
+    top: 37px;
+    left: 37px;
+}
+
+.lv-layout.lv-compact .vg-dpad {
+    width: 110px;
+    height: 110px;
+}
+
+.lv-layout.lv-compact .vg-dpad-btn {
+    width: 36px;
+    height: 36px;
+}
+
+.lv-layout.lv-compact .vg-dpad-btn.up, .lv-layout.lv-compact .vg-dpad-btn.down { left: 37px; }
+.lv-layout.lv-compact .vg-dpad-btn.left, .lv-layout.lv-compact .vg-dpad-btn.right { top: 37px; }
+
+.lv-layout.lv-compact .vg-abxy {
+    width: 130px;
+    height: 130px;
+}
+
+.lv-layout.lv-compact .vg-face {
+    width: 42px;
+    height: 42px;
+    font-size: 14px;
+}
+
+.lv-layout.lv-compact .vg-face.y, .lv-layout.lv-compact .vg-face.a { left: 44px; }
+.lv-layout.lv-compact .vg-face.x, .lv-layout.lv-compact .vg-face.b { top: 44px; }
+
+.lv-layout.lv-compact .vg-sys-btns { gap: 10px; }
+.lv-layout.lv-compact .vg-stick-btns { margin-top: 10px; }
+
+/* Enhanced Glow for Active Buttons */
+.vg-btn.active {
+    background: var(--accent-green) !important;
+    color: var(--accent-darkgreen) !important;
+    box-shadow: 
+        0 0 10px var(--accent-green),
+        0 0 20px var(--accent-green),
+        inset 0 0 10px rgba(255,255,255,0.5) !important;
+    filter: brightness(1.2);
+    border-color: var(--accent-darkgreen) !important;
+    transform: scale(0.95) !important;
+}
+
+/* Specific Face Button Colors when Glowing */
+.vg-face.y.active { box-shadow: 0 0 20px #ffca28; }
+.vg-face.a.active { box-shadow: 0 0 20px #66bb6a; }
+.vg-face.x.active { box-shadow: 0 0 20px #42a5f5; }
+.vg-face.b.active { box-shadow: 0 0 20px #ef5350; }

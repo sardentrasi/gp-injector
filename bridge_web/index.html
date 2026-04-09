@@ -125,47 +125,80 @@
             </div>
         </div>
 
+        <div id="dashboard-multi-viewer" style="margin-bottom:20px;">
+            <div class="row" style="flex-wrap: wrap; gap: 15px;" id="multi-status-container">
+                <!-- JS will populate status cards here -->
+            </div>
+        </div>
+
         <!-- Live Input Viewer -->
-        <div class="card">
-            <h2 class="card-title">Live Input Viewer</h2>
-            <div class="live-viewer">
-                <!-- Left Stick -->
-                <div class="viewer-block">
-                    <h3>Left Stick</h3>
-                    <canvas id="canvas-left-stick" width="160" height="160"></canvas>
-                    <div class="axis-values">
-                        <span>X: <b id="lx-val">0</b></span>
-                        <span>Y: <b id="ly-val">0</b></span>
+        <div class="card" id="dashboard-single-viewer">
+            <div class="setting-row" style="margin-bottom: 20px;">
+                <h2 class="card-title" style="margin:0;">Live Input Viewer</h2>
+                <div id="live-slot-selector-container" style="display:flex; align-items:center; gap:10px;">
+                    <span style="color:var(--text-muted); font-size:14px;">Viewing Slot:</span>
+                    <select id="live-slot-selector" class="select-input" style="padding: 4px 10px; font-size: 14px; width: auto;" onchange="changeLiveSlot()">
+                        <option value="1">Slot 1</option>
+                        <option value="2">Slot 2</option>
+                        <option value="3">Slot 3</option>
+                        <option value="4">Slot 4</option>
+                    </select>
+                </div>
+            </div>
+            <div class="live-viewer vg-layout lv-layout lv-compact" style="background:transparent; box-shadow:none; padding:0;">
+                <!-- Top Row: Triggers & Bumpers -->
+                <div class="vg-row vg-top">
+                    <div class="vg-trigger-group left">
+                        <div class="vg-btn vg-shoulder" id="lv-btn-LB">LB</div>
+                        <div class="vg-btn vg-trigger" id="lv-btn-LT_DIGITAL">LT</div>
+                    </div>
+                    <div class="vg-spacer"></div>
+                    <div class="vg-trigger-group right">
+                        <div class="vg-btn vg-shoulder" id="lv-btn-RB">RB</div>
+                        <div class="vg-btn vg-trigger" id="lv-btn-RT_DIGITAL">RT</div>
                     </div>
                 </div>
-                <!-- Right Stick -->
-                <div class="viewer-block">
-                    <h3>Right Stick</h3>
-                    <canvas id="canvas-right-stick" width="160" height="160"></canvas>
-                    <div class="axis-values">
-                        <span>X: <b id="rx-val">0</b></span>
-                        <span>Y: <b id="ry-val">0</b></span>
+
+                <!-- Main Row: Sticks & Buttons -->
+                <div class="vg-row vg-main">
+                    <!-- Left Zone: Stick L & DPad -->
+                    <div class="vg-zone vg-left">
+                        <div class="vg-stick-outer" id="lv-stick-outer-l">
+                            <div class="vg-stick-inner" id="lv-stick-l-dot"></div>
+                        </div>
+                        <div class="vg-dpad">
+                            <div class="vg-btn vg-dpad-btn up" id="lv-dpad-up">▲</div>
+                            <div class="vg-btn vg-dpad-btn left" id="lv-dpad-left">◄</div>
+                            <div class="vg-dpad-center"></div>
+                            <div class="vg-btn vg-dpad-btn right" id="lv-dpad-right">►</div>
+                            <div class="vg-btn vg-dpad-btn down" id="lv-dpad-down">▼</div>
+                        </div>
                     </div>
-                </div>
-                <!-- Buttons -->
-                <div class="viewer-block viewer-block-wide">
-                    <h3>Buttons</h3>
-                    <div class="button-grid" id="button-grid"></div>
-                </div>
-                <!-- Triggers & DPad -->
-                <div class="viewer-block">
-                    <h3>Triggers</h3>
-                    <div class="trigger-bars">
-                        <div class="trigger-row"><span>LT</span><div class="trigger-bar"><div class="trigger-fill" id="lt-bar"></div></div><span id="lt-val">0</span></div>
-                        <div class="trigger-row"><span>RT</span><div class="trigger-bar"><div class="trigger-fill" id="rt-bar"></div></div><span id="rt-val">0</span></div>
+
+                    <!-- Center Zone: System Buttons -->
+                    <div class="vg-zone vg-center">
+                        <div class="vg-sys-btns">
+                            <div class="vg-btn vg-rect" id="lv-btn-BACK">BACK</div>
+                            <div class="vg-btn vg-circle" id="lv-btn-HOME">H</div>
+                            <div class="vg-btn vg-rect" id="lv-btn-START">START</div>
+                        </div>
+                        <div class="vg-stick-btns">
+                            <div class="vg-btn vg-stick-btn" id="lv-btn-L3">L3</div>
+                            <div class="vg-btn vg-stick-btn" id="lv-btn-R3">R3</div>
+                        </div>
                     </div>
-                    <h3 style="margin-top:16px">DPad</h3>
-                    <div class="dpad-visual">
-                        <div class="dpad-btn dpad-up" id="dpad-up">▲</div>
-                        <div class="dpad-btn dpad-left" id="dpad-left">◄</div>
-                        <div class="dpad-center"></div>
-                        <div class="dpad-btn dpad-right" id="dpad-right">►</div>
-                        <div class="dpad-btn dpad-down" id="dpad-down">▼</div>
+
+                    <!-- Right Zone: ABXY & Stick R -->
+                    <div class="vg-zone vg-right">
+                        <div class="vg-abxy">
+                            <div class="vg-btn vg-face y" id="lv-btn-Y">Y</div>
+                            <div class="vg-btn vg-face x" id="lv-btn-X">X</div>
+                            <div class="vg-btn vg-face b" id="lv-btn-B">B</div>
+                            <div class="vg-btn vg-face a" id="lv-btn-A">A</div>
+                        </div>
+                        <div class="vg-stick-outer" id="lv-stick-outer-r">
+                            <div class="vg-stick-inner" id="lv-stick-r-dot"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -516,6 +549,20 @@
             <p class="tab-subtitle">Touch-friendly controller interface</p>
         </div>
         
+        <div class="card" id="vg-slot-card" style="margin-bottom: 20px; padding: 15px;">
+            <div class="setting-row" style="margin:0;">
+                <div class="setting-label">
+                    <h3 style="margin:0;">Target Slot</h3>
+                </div>
+                <select id="vg-slot-selector" class="select-input" style="padding: 4px 10px; font-size: 14px; width: auto;" onchange="changeVgSlot()">
+                    <option value="1">Slot 1</option>
+                    <option value="2">Slot 2</option>
+                    <option value="3">Slot 3</option>
+                    <option value="4">Slot 4</option>
+                </select>
+            </div>
+        </div>
+
         <div class="virtual-gamepad-container" id="vg-container">
             <!-- Mode Warning Overlay -->
             <div id="vg-mode-warning" class="vg-overlay" style="display: none;">
@@ -594,65 +641,15 @@
             <h1>Settings</h1>
             <p class="tab-subtitle">Hardware & connection configuration</p>
         </div>
-        <div class="card">
-            <div class="setting-row">
-                <div class="setting-label">
-                    <h3>Input Mode</h3>
-                    <p>Use gamepad or keyboard + mouse</p>
-                </div>
-                <select id="cfg-input-mode" class="select-input">
-                    <option value="gamepad">Gamepad</option>
-                    <option value="kb_mouse">Keyboard & Mouse</option>
-                    <option value="virtual_gamepad">Virtual Gamepad</option>
-                </select>
-            </div>
-            <hr class="divider">
-            <div class="setting-row" id="row-cfg-device">
-                <div class="setting-label">
-                    <h3>Gamepad Device</h3>
-                    <p>Active when in Gamepad mode</p>
-                </div>
-                <div class="device-select-group">
-                    <input type="text" id="cfg-device" class="text-input" value="auto">
-                    <button class="btn btn-secondary btn-sm" onclick="detectDevices('gamepad')">Detect</button>
-                </div>
-            </div>
-            <div id="detected-devices-gamepad" class="detected-devices" style="display:none"></div>
-            
-            <div class="setting-row kbmouse-only-setting" id="row-cfg-kb" style="display:none">
-                <div class="setting-label">
-                    <h3>Keyboard Device</h3>
-                </div>
-                <div class="device-select-group">
-                    <input type="text" id="cfg-keyboard" class="text-input" placeholder="/dev/input/eventX">
-                    <button class="btn btn-secondary btn-sm" onclick="detectDevices('keyboard')">Detect</button>
-                </div>
-            </div>
-            <div id="detected-devices-keyboard" class="detected-devices" style="display:none"></div>
+        <div id="settings-slots-box">
+            <!-- Multi-slot cards injected here via JS -->
+        </div>
 
-            <div class="setting-row kbmouse-only-setting" id="row-cfg-mouse" style="display:none">
-                <div class="setting-label">
-                    <h3>Mouse Device</h3>
-                </div>
-                <div class="device-select-group">
-                    <input type="text" id="cfg-mouse" class="text-input" placeholder="/dev/input/eventY">
-                    <button class="btn btn-secondary btn-sm" onclick="detectDevices('mouse')">Detect</button>
-                </div>
-            </div>
-            <div id="detected-devices-mouse" class="detected-devices" style="display:none"></div>
-            <hr class="divider">
+        <div class="card" style="margin-top: 15px;">
             <div class="setting-row">
                 <div class="setting-label">
-                    <h3>Serial Port</h3>
-                    <p>UART device path</p>
-                </div>
-                <input type="text" id="cfg-serial" class="text-input" value="/dev/ttyAMA0">
-            </div>
-            <hr class="divider">
-            <div class="setting-row">
-                <div class="setting-label">
-                    <h3>Baud Rate</h3>
-                    <p>UART speed</p>
+                    <h3>Global Baud Rate</h3>
+                    <p>UART speed for all connections</p>
                 </div>
                 <input type="number" id="cfg-baud" class="text-input text-input-short" value="500000">
             </div>
@@ -664,7 +661,10 @@
                 </div>
                 <input type="number" id="cfg-debug-interval" class="text-input text-input-short" value="0.5" step="0.1" min="0.1">
             </div>
-            <div class="card-actions">
+        </div>
+
+        <div class="card" style="margin-top: 15px;">
+            <div class="card-actions" style="margin: 0; justify-content: flex-end;">
                 <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
             </div>
         </div>
