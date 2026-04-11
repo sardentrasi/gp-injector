@@ -343,6 +343,13 @@ function manageLiveStream() {
         liveSocket.onerror = () => {
             if (liveSocket) { liveSocket.close(); liveSocket = null; }
         };
+        liveSocket.onclose = () => {
+            liveSocket = null;
+            // Auto-reconnect after 1s if bridge is still running
+            if (isBridgeRunning && (currentActiveTab === 'dashboard' || currentActiveTab === 'sticks')) {
+                setTimeout(() => manageLiveStream(), 1000);
+            }
+        };
     }
 }
 
@@ -361,39 +368,50 @@ function changeVgSlot() {
    LIVE INPUT VIEWER
    ============================================================ */
 
+// Cached DOM element references for high-frequency updates
+const _lvCache = {};
+function _lvEl(id) {
+    if (!_lvCache[id]) _lvCache[id] = document.getElementById(id);
+    return _lvCache[id];
+}
+
 function updateLiveViewer(state) {
     if (!state) return;
 
-    // Sticks
-    const axes = state.processed_axes || state.axes || {};
-    const rad = 35; // 35px visual bounded radius
-    const mapAxis = (val) => (val / 32768.0) * rad;
-
-    const stickL = document.getElementById('lv-stick-l-dot');
-    if (stickL) stickL.style.transform = `translate(${mapAxis(axes.lx || 0)}px, ${mapAxis(axes.ly || 0)}px)`;
-
-    const stickR = document.getElementById('lv-stick-r-dot');
-    if (stickR) stickR.style.transform = `translate(${mapAxis(axes.rx || 0)}px, ${mapAxis(axes.ry || 0)}px)`;
-
-    // Buttons
+    // --- Buttons ---
     const buttons = state.processed_buttons || state.buttons || {};
     for (const [btnName, isPressed] of Object.entries(buttons)) {
-        const el = document.getElementById('lv-btn-' + btnName);
-        if (el) {
-            if (isPressed) el.classList.add('active');
-            else el.classList.remove('active');
-        }
+        const el = _lvEl('ctrl-btn-' + btnName);
+        if (el) el.classList.toggle('active', !!isPressed);
     }
 
-    // DPad
+    // --- DPad ---
     const dpad = state.dpad || {};
-    ['up', 'down', 'left', 'right'].forEach(dir => {
-        const el = document.getElementById('lv-dpad-' + dir);
-        if (el) {
-            if (dpad[dir]) el.classList.add('active');
-            else el.classList.remove('active');
-        }
-    });
+    const dirs = ['up', 'down', 'left', 'right'];
+    for (let i = 0; i < 4; i++) {
+        const el = _lvEl('ctrl-dpad-' + dirs[i]);
+        if (el) el.classList.toggle('active', !!dpad[dirs[i]]);
+    }
+
+    // --- Analog Sticks ---
+    const axes = state.processed_axes || state.axes || {};
+    const travelPct = 6.5;
+
+    const stickL = _lvEl('ctrl-stick-l');
+    if (stickL) {
+        const lx = (axes.lx || 0) / 32768.0;
+        const ly = (axes.ly || 0) / 32768.0;
+        stickL.style.left = (22.46 + lx * travelPct) + '%';
+        stickL.style.top  = (50.73 + ly * travelPct) + '%';
+    }
+
+    const stickR = _lvEl('ctrl-stick-r');
+    if (stickR) {
+        const rx = (axes.rx || 0) / 32768.0;
+        const ry = (axes.ry || 0) / 32768.0;
+        stickR.style.left = (63.72 + rx * travelPct) + '%';
+        stickR.style.top  = (75.28 + ry * travelPct) + '%';
+    }
 }
 
 function drawStick(canvasId, x, y) {

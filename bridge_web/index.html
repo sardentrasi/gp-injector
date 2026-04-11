@@ -145,62 +145,33 @@
                     </select>
                 </div>
             </div>
-            <div class="live-viewer vg-layout lv-layout lv-compact" style="background:transparent; box-shadow:none; padding:0;">
-                <!-- Top Row: Triggers & Bumpers -->
-                <div class="vg-row vg-top">
-                    <div class="vg-trigger-group left">
-                        <div class="vg-btn vg-shoulder" id="lv-btn-LB">LB</div>
-                        <div class="vg-btn vg-trigger" id="lv-btn-LT_DIGITAL">LT</div>
-                    </div>
-                    <div class="vg-spacer"></div>
-                    <div class="vg-trigger-group right">
-                        <div class="vg-btn vg-shoulder" id="lv-btn-RB">RB</div>
-                        <div class="vg-btn vg-trigger" id="lv-btn-RT_DIGITAL">RT</div>
-                    </div>
-                </div>
+            <!-- Xbox One S Controller Overlay Viewer -->
+            <div class="controller-viewer" id="controller-viewer">
+                <!-- Base Controller Body -->
+                <img src="assets/XB1_S_base.png" class="controller-layer controller-base" alt="Xbox One S Controller" draggable="false">
 
-                <!-- Main Row: Sticks & Buttons -->
-                <div class="vg-row vg-main">
-                    <!-- Left Zone: Stick L & DPad -->
-                    <div class="vg-zone vg-left">
-                        <div class="vg-stick-outer" id="lv-stick-outer-l">
-                            <div class="vg-stick-inner" id="lv-stick-l-dot"></div>
-                        </div>
-                        <div class="vg-dpad">
-                            <div class="vg-btn vg-dpad-btn up" id="lv-dpad-up">▲</div>
-                            <div class="vg-btn vg-dpad-btn left" id="lv-dpad-left">◄</div>
-                            <div class="vg-dpad-center"></div>
-                            <div class="vg-btn vg-dpad-btn right" id="lv-dpad-right">►</div>
-                            <div class="vg-btn vg-dpad-btn down" id="lv-dpad-down">▼</div>
-                        </div>
-                    </div>
+                <!-- Button Press Overlays (hidden by default) -->
+                <img src="assets/XB1_A_Button.png"            class="controller-layer controller-btn-overlay" id="ctrl-btn-A"          alt="" draggable="false">
+                <img src="assets/XB1_B_Button.png"            class="controller-layer controller-btn-overlay" id="ctrl-btn-B"          alt="" draggable="false">
+                <img src="assets/XB1_X_Button.png"            class="controller-layer controller-btn-overlay" id="ctrl-btn-X"          alt="" draggable="false">
+                <img src="assets/XB1_Y_Button.png"            class="controller-layer controller-btn-overlay" id="ctrl-btn-Y"          alt="" draggable="false">
+                <img src="assets/XB1_LeftBumper_Active.png"    class="controller-layer controller-btn-overlay" id="ctrl-btn-LB"         alt="" draggable="false">
+                <img src="assets/XB1_RightBumper_Active.png"   class="controller-layer controller-btn-overlay" id="ctrl-btn-RB"         alt="" draggable="false">
+                <img src="assets/XB1_LeftTrigger_Active.png"   class="controller-layer controller-btn-overlay" id="ctrl-btn-LT_DIGITAL" alt="" draggable="false">
+                <img src="assets/XB1_RightTrigger_Active.png"  class="controller-layer controller-btn-overlay" id="ctrl-btn-RT_DIGITAL" alt="" draggable="false">
+                <img src="assets/XB1_LeftStick_Click.png"      class="controller-layer controller-btn-overlay" id="ctrl-btn-L3"         alt="" draggable="false">
+                <img src="assets/XB1_RightStick_Click.png"     class="controller-layer controller-btn-overlay" id="ctrl-btn-R3"         alt="" draggable="false">
+                <img src="assets/XB1_MenuButton.png"           class="controller-layer controller-btn-overlay" id="ctrl-btn-START"      alt="" draggable="false">
+                <img src="assets/XB1_ViewButton.png"           class="controller-layer controller-btn-overlay" id="ctrl-btn-BACK"       alt="" draggable="false">
+                <img src="assets/XB1_HomeButton.png"           class="controller-layer controller-btn-overlay" id="ctrl-btn-HOME"       alt="" draggable="false">
+                <img src="assets/XB1_D-PAD_Up.png"            class="controller-layer controller-btn-overlay" id="ctrl-dpad-up"        alt="" draggable="false">
+                <img src="assets/XB1_D-PAD_Down.png"          class="controller-layer controller-btn-overlay" id="ctrl-dpad-down"      alt="" draggable="false">
+                <img src="assets/XB1_D-PAD_Left.png"          class="controller-layer controller-btn-overlay" id="ctrl-dpad-left"      alt="" draggable="false">
+                <img src="assets/XB1_D-PAD_Right.png"         class="controller-layer controller-btn-overlay" id="ctrl-dpad-right"     alt="" draggable="false">
 
-                    <!-- Center Zone: System Buttons -->
-                    <div class="vg-zone vg-center">
-                        <div class="vg-sys-btns">
-                            <div class="vg-btn vg-rect" id="lv-btn-BACK">BACK</div>
-                            <div class="vg-btn vg-circle" id="lv-btn-HOME">H</div>
-                            <div class="vg-btn vg-rect" id="lv-btn-START">START</div>
-                        </div>
-                        <div class="vg-stick-btns">
-                            <div class="vg-btn vg-stick-btn" id="lv-btn-L3">L3</div>
-                            <div class="vg-btn vg-stick-btn" id="lv-btn-R3">R3</div>
-                        </div>
-                    </div>
-
-                    <!-- Right Zone: ABXY & Stick R -->
-                    <div class="vg-zone vg-right">
-                        <div class="vg-abxy">
-                            <div class="vg-btn vg-face y" id="lv-btn-Y">Y</div>
-                            <div class="vg-btn vg-face x" id="lv-btn-X">X</div>
-                            <div class="vg-btn vg-face b" id="lv-btn-B">B</div>
-                            <div class="vg-btn vg-face a" id="lv-btn-A">A</div>
-                        </div>
-                        <div class="vg-stick-outer" id="lv-stick-outer-r">
-                            <div class="vg-stick-inner" id="lv-stick-r-dot"></div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Analog Stick Dots -->
+                <div class="controller-stick-dot" id="ctrl-stick-l" style="left: 22.46%; top: 50.73%;"></div>
+                <div class="controller-stick-dot" id="ctrl-stick-r" style="left: 63.72%; top: 75.28%;"></div>
             </div>
         </div>
 

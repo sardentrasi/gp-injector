@@ -594,7 +594,13 @@ class BridgeWorker(threading.Thread):
             hex_str = " ".join("{:02X}".format(b) for b in packet)
             self._log("[PKT] " + hex_str)
 
-        ser.write(packet)
+        try:
+            ser.write(packet)
+        except serial.SerialTimeoutException:
+            # Drop packet if UART buffer is full, prevents bridge from crashing during bursts
+            pass
+        except Exception as e:
+            self._log("[X] UART write error: " + str(e))
 
     # ---- Gamepad mode ----
     def _run_gamepad(self, config):
@@ -635,7 +641,12 @@ class BridgeWorker(threading.Thread):
             return
 
         try:
-            ser = serial.Serial(config['serial_port'], config['baud_rate'], timeout=0)
+            ser = serial.Serial(
+                config['serial_port'], 
+                config['baud_rate'], 
+                timeout=0, 
+                write_timeout=0.01  # Prevent UART thread from hanging if buffer fills
+            )
             self._log("[V] UART: {} @ {}".format(config['serial_port'], config['baud_rate']))
         except Exception as e:
             self._log("[X] UART error: " + str(e))
@@ -728,7 +739,12 @@ class BridgeWorker(threading.Thread):
     # ---- Virtual Gamepad mode ----
     def _run_virtual_gamepad(self, config):
         try:
-            ser = serial.Serial(config['serial_port'], config['baud_rate'], timeout=0)
+            ser = serial.Serial(
+                config['serial_port'], 
+                config['baud_rate'], 
+                timeout=0, 
+                write_timeout=0.01
+            )
             self._log("[V] UART: {} @ {} (Virtual Mode)".format(config['serial_port'], config['baud_rate']))
         except Exception as e:
             self._log("[X] UART error: " + str(e))
@@ -850,7 +866,12 @@ class BridgeWorker(threading.Thread):
             self._device_info = {'name': ' + '.join(names), 'path': 'KB+Mouse'}
 
         try:
-            ser = serial.Serial(config['serial_port'], config['baud_rate'], timeout=0)
+            ser = serial.Serial(
+                config['serial_port'], 
+                config['baud_rate'], 
+                timeout=0, 
+                write_timeout=0.01
+            )
             self._log("[V] UART: {} @ {}".format(config['serial_port'], config['baud_rate']))
         except Exception as e:
             self._log("[X] UART error: " + str(e))

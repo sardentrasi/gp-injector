@@ -1380,81 +1380,88 @@ h1, h2, h3, h4 {
     .vg-face.y, .vg-face.a { left: 48px; }
     .vg-face.x, .vg-face.b { top: 48px; }
 }
-/* Compact Live Viewer for Dashboard */
-.lv-layout.lv-compact {
-    gap: 12px;
-    height: auto;
-    max-width: 900px;
+/* ============================================================
+   CONTROLLER OVERLAY VIEWER (Xbox One S)
+   ============================================================ */
+.controller-viewer {
+    position: relative;
+    width: 70%;
+    max-width: 700px;
     margin: 0 auto;
-    pointer-events: none;
+    aspect-ratio: 1543 / 956;
     user-select: none;
+    -webkit-user-select: none;
+    pointer-events: none;
+    overflow: hidden;
 }
 
-.lv-layout.lv-compact .vg-main {
-    margin-top: 10px;
+.controller-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
 }
 
-.lv-layout.lv-compact .vg-zone {
-    gap: 20px;
+.controller-base {
+    position: relative;
+    display: block;
+    z-index: 1;
+    filter: drop-shadow(0 2px 16px rgba(0, 0, 0, 0.2));
 }
 
-.lv-layout.lv-compact .vg-stick-outer {
-    width: 130px;
-    height: 130px;
+.controller-btn-overlay {
+    opacity: 0;
+    z-index: 2;
+    transition: opacity 0.06s ease-out;
 }
 
-.lv-layout.lv-compact .vg-stick-inner {
-    width: 56px;
-    height: 56px;
-    top: 37px;
-    left: 37px;
+.controller-btn-overlay.active {
+    opacity: 1;
 }
 
-.lv-layout.lv-compact .vg-dpad {
-    width: 110px;
-    height: 110px;
+/* Analog Stick Indicators */
+.controller-stick-dot {
+    position: absolute;
+    width: 3.5%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(159, 232, 112, 0.9) 0%, rgba(159, 232, 112, 0.25) 60%, transparent 100%);
+    border: 2px solid rgba(159, 232, 112, 0.7);
+    box-shadow:
+        0 0 8px rgba(159, 232, 112, 0.5),
+        0 0 16px rgba(159, 232, 112, 0.2),
+        inset 0 0 4px rgba(255, 255, 255, 0.25);
+    z-index: 10;
+    transform: translate(-50%, -50%);
+    transition: left 0.04s linear, top 0.04s linear;
+    pointer-events: none;
 }
 
-.lv-layout.lv-compact .vg-dpad-btn {
-    width: 36px;
-    height: 36px;
+:root.dark-mode .controller-base {
+    filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.4));
 }
 
-.lv-layout.lv-compact .vg-dpad-btn.up, .lv-layout.lv-compact .vg-dpad-btn.down { left: 37px; }
-.lv-layout.lv-compact .vg-dpad-btn.left, .lv-layout.lv-compact .vg-dpad-btn.right { top: 37px; }
-
-.lv-layout.lv-compact .vg-abxy {
-    width: 130px;
-    height: 130px;
+:root.dark-mode .controller-btn-overlay.active {
+    opacity: 1;
+    filter: brightness(1.15);
 }
 
-.lv-layout.lv-compact .vg-face {
-    width: 42px;
-    height: 42px;
-    font-size: 14px;
+:root.dark-mode .controller-stick-dot {
+    background: radial-gradient(circle, rgba(159, 232, 112, 1) 0%, rgba(159, 232, 112, 0.35) 60%, transparent 100%);
+    box-shadow:
+        0 0 10px rgba(159, 232, 112, 0.7),
+        0 0 22px rgba(159, 232, 112, 0.3),
+        inset 0 0 6px rgba(255, 255, 255, 0.3);
 }
 
-.lv-layout.lv-compact .vg-face.y, .lv-layout.lv-compact .vg-face.a { left: 44px; }
-.lv-layout.lv-compact .vg-face.x, .lv-layout.lv-compact .vg-face.b { top: 44px; }
-
-.lv-layout.lv-compact .vg-sys-btns { gap: 10px; }
-.lv-layout.lv-compact .vg-stick-btns { margin-top: 10px; }
-
-/* Enhanced Glow for Active Buttons */
-.vg-btn.active {
-    background: var(--accent-green) !important;
-    color: var(--accent-darkgreen) !important;
-    box-shadow: 
-        0 0 10px var(--accent-green),
-        0 0 20px var(--accent-green),
-        inset 0 0 10px rgba(255,255,255,0.5) !important;
-    filter: brightness(1.2);
-    border-color: var(--accent-darkgreen) !important;
-    transform: scale(0.95) !important;
+/* Responsive: ensure proper scaling */
+@media (max-width: 768px) {
+    .controller-viewer {
+        width: 100%;
+        max-width: 100%;
+    }
 }
 
-/* Specific Face Button Colors when Glowing */
-.vg-face.y.active { box-shadow: 0 0 20px #ffca28; }
-.vg-face.a.active { box-shadow: 0 0 20px #66bb6a; }
-.vg-face.x.active { box-shadow: 0 0 20px #42a5f5; }
-.vg-face.b.active { box-shadow: 0 0 20px #ef5350; }
